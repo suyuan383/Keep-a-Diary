@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f8">
+<title>日常记录</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/modules/habit.css">
+<link rel="stylesheet" href="css/modules/ledger.css">
+<link rel="stylesheet" href="css/modules/weight.css">
+<link rel="stylesheet" href="css/modules/event.css">
+<link rel="stylesheet" href="css/modules/wishlist.css">
+<!-- 新增模块时在这里加一行 <link> -->
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-mask" id="sidebarMask"></div>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="菜单">☰</button>
+      <h1 class="topbar-title" id="topbarTitle">日常记录</h1>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<!-- 1. 全局配置 -->
+<script src="js/config/app.config.js"></script>
+
+<!-- 2. 内核（顺序固定，不要改） -->
+<script src="js/core/util.js"></script>
+<script src="js/core/bus.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/core/ui.js"></script>
+<script src="js/core/registry.js"></script>
+<script src="js/core/router.js"></script>
+<script src="js/core/app.js"></script>
+
+<!-- 3. 业务模块：新增模块只需在这里加一行 -->
+<script src="js/modules/habit.js"></script>
+<script src="js/modules/ledger.js"></script>
+<script src="js/modules/weight.js"></script>
+<script src="js/modules/event.js"></script>
+<script src="js/modules/wishlist.js"></script>
+
+<!-- 4. 系统视图 -->
+<script src="js/views/home.js"></script>
+<script src="js/views/settings.js"></script>
+
+<!-- 5. 启动 -->
+<script src="js/main.js"></script>
+</body>
+</html>

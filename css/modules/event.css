@@ -1,0 +1,433 @@
+/* =====================================================
+   事件记录模块
+   ===================================================== */
+
+.event-module { position: relative; padding-bottom: 72px; }
+
+.event-page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.event-page-title { font-size: 17px; font-weight: 600; color: var(--text); }
+.event-tag-mgr-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.event-tag-mgr-btn:active { background: #f0f2f5; }
+
+/* ---------- 筛选栏 ---------- */
+.event-filter-bar {
+  display: flex; gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.event-filter-bar::-webkit-scrollbar { display: none; }
+
+.ev-filter {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.ev-filter:active { transform: scale(.97); }
+.ev-filter.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.ev-filter-divider {
+  width: 1px;
+  background: var(--line);
+  margin: 4px 2px;
+  flex-shrink: 0;
+}
+
+/* ---------- 时间轴 ---------- */
+.timeline {
+  position: relative;
+  padding-left: 28px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px; top: 10px; bottom: 10px;
+  width: 2px;
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.tl-day {
+  position: relative;
+  margin-bottom: 22px;
+}
+.tl-day:last-child { margin-bottom: 0; }
+
+.tl-day-head {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.tl-dot {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--primary);
+  box-sizing: border-box;
+}
+.tl-date {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.tl-count {
+  font-size: 11px; color: var(--text-3);
+  background: #f0f2f5;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.tl-cards {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.tl-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  cursor: pointer;
+  transition: transform .1s ease;
+}
+.tl-card:active { transform: scale(.995); }
+
+.tl-card-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.tl-card-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 44px;
+}
+.tl-card-main { flex: 1; min-width: 0; }
+.tl-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+.tl-card-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin-top: 4px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.tl-card-tags {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.tl-tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.tl-card-arrow {
+  color: var(--text-3);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ---------- 主页卡片事件列表 ---------- */
+.event-home-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.event-home-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.event-home-item:last-child { border-bottom: none; }
+.ev-home-time {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+}
+.ev-home-title {
+  flex: 1; min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ev-home-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* ---------- 事件表单 ---------- */
+.ev-form-panel { max-height: 92vh; }
+
+.ev-form-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.ev-form-section { margin-bottom: 14px; }
+.ev-form-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.ev-form-input,
+.ev-form-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fafbfc;
+  font: inherit;
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+.ev-form-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+.ev-form-input:focus,
+.ev-form-textarea:focus {
+  border-color: var(--primary);
+  background: #fff;
+}
+
+.ev-form-row { display: flex; gap: 10px; }
+.ev-form-half { flex: 1; min-width: 0; }
+
+/* ---------- 标签选择器 ---------- */
+.ev-tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ev-tag-pick {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.ev-tag-pick.active { font-weight: 600; }
+.ev-tag-add {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  background: #fff;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ev-tag-quick { margin-top: 8px; }
+.ev-tag-quick-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* ---------- 标签管理 ---------- */
+.tag-mgr-panel { max-height: 80vh; }
+.tag-mgr-list {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 16px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.tag-mgr-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: #fafbfc;
+  border-radius: 10px;
+}
+.tag-mgr-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 3px solid;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.tag-mgr-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+.tag-mgr-btn { padding: 4px 10px; font-size: 12px; }
+
+.color-picker {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.color-pick {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: box-shadow .15s ease;
+}
+.color-pick.active {
+  box-shadow: 0 0 0 3px rgba(76,139,245,.2);
+}
+/* ============ 视图 Tab 头部 ============ */
+.ev-view-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.ev-view-title {
+  font-weight: 600; font-size: 15px;
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; text-align: center; justify-content: center;
+}
+.ev-view-right { display: flex; gap: 6px; align-items: center; }
+
+/* ============ 日期筛选 chip ============ */
+.ev-date-chip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.ev-date-chip button {
+  border: none; background: transparent;
+  color: var(--primary); font-size: 20px;
+  cursor: pointer; padding: 0 4px;
+  line-height: 1;
+}
+
+/* ============ 月视图 ============ */
+.ev-month-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.ev-month-week {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; font-size: 12px; color: var(--text-3);
+  padding-bottom: 8px;
+}
+.ev-month-body {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.ev-month-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #f7f8fa; color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  position: relative;
+  transition: transform .1s ease;
+}
+.ev-month-cell:active { transform: scale(.94); }
+.ev-month-cell.empty { background: transparent; cursor: default; }
+.ev-month-cell.future { background: #fafbfc; color: #ccd2d9; cursor: default; }
+.ev-month-cell.has-data {
+  background: linear-gradient(135deg, #d9ecff, #bcdaff);
+  color: #1c62b8;
+  font-weight: 600;
+}
+.ev-month-cell.today {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.ev-month-day { font-size: 13px; line-height: 1; }
+.ev-month-count {
+  font-size: 9px;
+  background: rgba(76,139,245,.85);
+  color: #fff;
+  padding: 0 4px;
+  border-radius: 999px;
+  margin-top: 2px;
+  line-height: 1.4;
+  min-width: 12px;
+  text-align: center;
+}
+
+/* ============ 年视图 ============ */
+.ev-year-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-bottom: 12px;
+}
+.ev-year-cell {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 14px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform .1s ease;
+}
+.ev-year-cell:active { transform: scale(.97); }
+.ev-year-cell.future { opacity: .5; cursor: default; }
+.ev-year-cell.has-data {
+  background: linear-gradient(135deg, #d9ecff, #bcdaff);
+}
+.ev-year-cell.current { outline: 2px solid var(--primary); }
+.ev-year-m { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+.ev-year-c { font-size: 11px; color: var(--text-3); }
+.ev-year-cell.has-data .ev-year-m { color: #1c62b8; }
+.ev-year-cell.has-data .ev-year-c { color: #4c8bf5; font-weight: 600; }
+
+.ev-view-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 4px;
+  margin-bottom: 16px;
+}

@@ -1,0 +1,242 @@
+/* =====================================================
+   体重模块
+   ===================================================== */
+
+/* ---------- 主页卡片 ---------- */
+.weight-home-body { padding-top: 4px; }
+.weight-home-main {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-bottom: 6px;
+}
+.weight-home-num {
+  font-size: 26px; font-weight: 700; line-height: 1;
+  color: var(--text);
+}
+.weight-home-unit { font-size: 13px; color: var(--text-2); }
+.weight-delta { font-size: 12px; margin-left: auto; }
+.weight-delta.up { color: #d9534f; }
+.weight-delta.down { color: #2fb56b; }
+
+.weight-home-sub {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 6px;
+}
+
+.weight-home-target {
+  font-size: 12px; padding: 4px 8px;
+  border-radius: 8px; margin-bottom: 4px;
+  background: #f5f6f8; color: var(--text-2);
+}
+.weight-home-target.over  { background: #fdecec; color: #b02a2a; }
+.weight-home-target.under { background: #eaf1fe; color: #2a6fd6; }
+.weight-home-target.done  { background: #e6f7ec; color: #157347; }
+
+.weight-home-date { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+/* ---------- 详情页 ---------- */
+.weight-module .detail-head { margin-bottom: 10px; }
+
+/* 图表卡片 */
+.chart-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.chart-title {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; color: var(--text-2); margin-bottom: 4px;
+  gap: 8px;
+}
+.chart-title > span:first-child { font-weight: 600; color: var(--text); flex: 0 0 auto; }
+.chart-unit { font-size: 11px; color: var(--text-3); text-align: right; }
+.chart { width: 100%; height: auto; display: block; }
+
+/* 统计行 */
+.stats-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+.stat-item {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 8px; text-align: center;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.stat-item > span { font-size: 11px; color: var(--text-3); }
+.stat-item > strong { font-size: 15px; }
+.stat-item > strong.up { color: #d9534f; }
+.stat-item > strong.down { color: #2fb56b; }
+
+/* 记录明细 */
+.record-list-title {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 4px 4px 8px;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+}
+.record-list { display: flex; flex-direction: column; gap: 8px; }
+.record-item {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.record-main { flex: 1; min-width: 0; }
+.record-date { font-size: 12px; color: var(--text-3); margin-bottom: 2px; }
+.record-weight-line {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.record-weight {
+  font-size: 18px; font-weight: 700; color: var(--text);
+}
+.record-weight > i {
+  font-style: normal; font-size: 12px;
+  font-weight: 400; color: var(--text-2); margin-left: 2px;
+}
+.record-tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
+}
+.record-note {
+  font-size: 12px; color: var(--text-3); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.record-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.record-actions .btn { padding: 5px 9px; font-size: 12px; }
+
+/* ---------- BMI / 体脂 标签 ---------- */
+.bmi-tag {
+  display: inline-block; font-size: 11px;
+  padding: 2px 8px; border-radius: 999px;
+  background: #f0f2f5; color: var(--text-2);
+}
+.bmi-tag.bmi-thin   { background: #e7f1fe; color: #2a6fd6; }
+.bmi-tag.bmi-ok     { background: #e6f7ec; color: #157347; }
+.bmi-tag.bmi-over   { background: #fef4e0; color: #b8760a; }
+.bmi-tag.bmi-obese  { background: #fdecec; color: #b02a2a; }
+
+.bmi-tag.bf-low        { background: #e7f1fe; color: #2a6fd6; }
+.bmi-tag.bf-excellent  { background: #e6f7ec; color: #157347; }
+.bmi-tag.bf-good       { background: #eafaf1; color: #2fb56b; }
+.bmi-tag.bf-fair       { background: #fef4e0; color: #b8760a; }
+.bmi-tag.bf-high       { background: #fdecec; color: #b02a2a; }
+/* =====================================================
+   目标进度（主页卡片 + 详情页共用样式）
+   ===================================================== */
+
+/* ---------- 主页卡片里的进度块 ---------- */
+.weight-target {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f7f8fa;
+}
+.weight-target-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 12px; color: var(--text-2);
+}
+.weight-target-label { font-weight: 600; color: var(--text); }
+.weight-target-pct {
+  font-weight: 700; color: var(--primary); font-size: 13px;
+}
+.weight-target-pct.done { color: var(--success); }
+
+.weight-target-bar {
+  height: 8px;
+  background: #e5e7eb; border-radius: 999px;
+  overflow: hidden; margin-bottom: 6px;
+}
+.weight-target-bar > i {
+  display: block; height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4c8bf5, #6ea8fe);
+  transition: width .3s ease;
+}
+/* 减重/增重颜色区分 */
+.weight-target.lose .weight-target-bar > i {
+  background: linear-gradient(90deg, #4c8bf5, #6ea8fe);
+}
+.weight-target.gain .weight-target-bar > i {
+  background: linear-gradient(90deg, #2fb56b, #4cd68a);
+}
+
+.weight-target-foot {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-3);
+}
+.weight-target-now { color: var(--text-2); font-weight: 600; }
+.weight-target-status {
+  margin-top: 6px; font-size: 12px;
+  color: var(--text-2); text-align: center;
+}
+.weight-target-status.done {
+  color: var(--success); font-weight: 600;
+}
+
+/* ---------- 详情页目标卡片 ---------- */
+.target-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.target-card.empty {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  background: #fafbfc;
+}
+.target-empty-text { color: var(--text-3); font-size: 13px; }
+
+.target-card-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.target-card-title {
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.target-card-pct {
+  font-size: 20px; font-weight: 700; color: var(--primary); line-height: 1;
+}
+.target-card-pct.done { color: var(--success); }
+
+.target-card-bar {
+  height: 12px;
+  background: #eef0f3; border-radius: 999px;
+  overflow: hidden; margin-bottom: 10px;
+  position: relative;
+}
+.target-card-bar > i {
+  display: block; height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4c8bf5, #6ea8fe);
+  transition: width .35s ease;
+  position: relative;
+}
+.target-card-bar > i::after {
+  content: '';
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: rgba(255,255,255,.5);
+  border-radius: 999px;
+}
+
+.target-card-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--text-3);
+}
+.target-card-now {
+  color: var(--text); font-weight: 600;
+  padding: 1px 8px; border-radius: 999px;
+  background: #f0f2f5;
+}
+
+.target-card-status {
+  margin-top: 10px; text-align: center;
+  font-size: 13px; color: var(--text-2);
+}
+.target-card-status.done {
+  color: var(--success); font-weight: 600; font-size: 14px;
+}

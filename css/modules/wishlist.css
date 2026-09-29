@@ -1,0 +1,269 @@
+/* =====================================================
+   年度愿望
+   ===================================================== */
+.wish-module { position: relative; padding-bottom: 72px; }
+
+.wish-page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.wish-page-title { font-size: 17px; font-weight: 600; color: var(--text); }
+.wish-head-actions { display: flex; gap: 6px; }
+.wish-head-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.wish-head-btn:active { background: #f0f2f5; }
+
+.wish-year-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.wish-year-title {
+  font-weight: 600; font-size: 16px;
+  display: flex; align-items: center; gap: 6px;
+}
+.wish-year-right { display: flex; gap: 6px; align-items: center; }
+
+.wish-progress-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.wish-progress-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.wish-progress-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.wish-progress-pct { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.wish-progress-bar {
+  height: 10px; background: #eef0f3;
+  border-radius: 999px; overflow: hidden;
+}
+.wish-progress-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #f0a020, #f5c164);
+  border-radius: 999px; transition: width .3s ease;
+}
+
+.wish-filter-bar { margin-bottom: 8px; }
+.wish-search {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit; color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+.wish-search:focus { border-color: var(--primary); }
+
+.wish-status-bar {
+  display: flex; gap: 6px;
+  margin-bottom: 12px;
+}
+.wish-filter-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.wish-filter-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.wish-list { display: flex; flex-direction: column; gap: 8px; }
+.wish-item {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  transition: opacity .15s ease;
+}
+.wish-item.done { opacity: .55; }
+.wish-item.done .wish-text { text-decoration: line-through; color: var(--text-3); }
+
+.wish-check {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid #ccd2d9;
+  background: #fff;
+  color: #fff;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  transition: all .15s ease;
+}
+.wish-item.done .wish-check {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.wish-text {
+  flex: 1; min-width: 0;
+  font-size: 14px; color: var(--text);
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.wish-del {
+  border: none; background: transparent;
+  color: #ccd2d9; font-size: 20px;
+  cursor: pointer; padding: 2px 6px;
+  line-height: 1;
+}
+.wish-del:active { color: var(--danger); }
+
+/* 主页卡片 */
+.wish-home-progress {
+  height: 6px; background: #eef0f3;
+  border-radius: 999px; overflow: hidden;
+  margin: 8px 0 10px;
+}
+.wish-home-progress > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #f0a020, #f5c164);
+  border-radius: 999px;
+}
+.wish-home-list { display: flex; flex-direction: column; gap: 5px; }
+.wish-home-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text-2);
+}
+.wish-home-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #ccd2d9; flex-shrink: 0;
+}
+.wish-home-text {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wish-home-empty {
+  font-size: 13px; color: var(--success); text-align: center;
+  padding: 4px 0;
+}
+
+/* AI 导入 */
+.wish-import-panel { max-height: 90vh; }
+.wish-import-hint {
+  font-size: 12px; color: var(--text-3);
+  line-height: 1.6;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+}
+.wish-import-hint code {
+  background: #fff; padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--primary);
+}
+.wish-import-textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fafbfc;
+  font: inherit; color: var(--text);
+  outline: none; resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+.wish-import-textarea:focus { border-color: var(--primary); background: #fff; }
+
+.wish-import-count {
+  font-size: 12px; color: var(--text-2);
+  margin-bottom: 8px;
+}
+.wish-import-count strong {
+  color: var(--primary); font-size: 15px;
+}
+.wish-import-preview {
+  max-height: 180px; overflow-y: auto;
+  padding: 8px 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.8;
+}
+.wish-import-preview:empty { display: none; }
+.wish-import-preview-item {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wish-import-more {
+  color: var(--text-3); font-style: italic; margin-top: 4px;
+}
+
+/* 年度报告 */
+.wish-report-box {
+  max-width: 440px !important;
+  max-height: 82vh;
+  display: flex; flex-direction: column;
+}
+.wish-report-box .modal-body {
+  overflow-y: auto;
+  max-height: 60vh;
+}
+.report-hero {
+  text-align: center;
+  padding: 16px 0 20px;
+}
+.report-pct {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.report-sub { font-size: 13px; color: var(--text-3); }
+
+.report-section-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--text-2);
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.report-list { display: flex; flex-direction: column; gap: 4px; }
+.report-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.report-row.done { color: var(--text); }
+.report-row.undone { color: var(--text-3); }
+.report-check {
+  font-weight: 700;
+  color: var(--success);
+  flex-shrink: 0;
+}
+.report-row.undone .report-check { color: #ccd2d9; }
+.report-empty {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; padding: 8px;
+}
