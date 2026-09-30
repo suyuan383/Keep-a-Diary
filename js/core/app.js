@@ -212,7 +212,11 @@ App.showQuickSheet = function () {
       </div>
     </div>`;
   document.body.appendChild(mask);
-  requestAnimationFrame(() => mask.classList.add('show'));
+requestAnimationFrame(() => {
+  mask.classList.add('show');
+  const sheet = mask.querySelector('.quick-sheet');
+  if (sheet) sheet.classList.add('show');
+});
 
   mask.addEventListener('click', e => {
     if (e.target === mask) { closeQuick(); return; }
