@@ -191,33 +191,40 @@ function computeBudgetStatus() {
     const colW = cw / data.length;
     const barW = Math.max(3, colW * 0.3);
     const gap = 2;
+const incGradId = 'inc_' + Math.random().toString(36).slice(2, 8);
+const expGradId = 'exp_' + Math.random().toString(36).slice(2, 8);
+let bars = '';
+data.forEach((d, i) => {
+  const cx = padL + colW * (i + 0.5);
+  const hInc = maxVal ? (d.income / maxVal) * ch : 0;
+  const hExp = maxVal ? (d.expense / maxVal) * ch : 0;
+  if (d.income > 0) {
+    bars += `<rect x="${cx - barW - gap / 2}" y="${padT + ch - hInc}"
+      width="${barW}" height="${hInc}" fill="url(#${incGradId})" rx="3"/>`;
+  }
+  if (d.expense > 0) {
+    bars += `<rect x="${cx + gap / 2}" y="${padT + ch - hExp}"
+      width="${barW}" height="${hExp}" fill="url(#${expGradId})" rx="3"/>`;
+  }
+  bars += `<text x="${cx}" y="${H - 8}" text-anchor="middle"
+    font-size="10" fill="#999">${d.label}</text>`;
+});
 
-    let bars = '';
-    data.forEach((d, i) => {
-      const cx = padL + colW * (i + 0.5);
-      const hInc = maxVal ? (d.income / maxVal) * ch : 0;
-      const hExp = maxVal ? (d.expense / maxVal) * ch : 0;
-
-      // 收入柱（左）
-      if (d.income > 0) {
-        bars += `<rect x="${cx - barW - gap / 2}" y="${padT + ch - hInc}"
-          width="${barW}" height="${hInc}" fill="#7dd6a4" rx="1.5"/>`;
-      }
-      // 支出柱（右）
-      if (d.expense > 0) {
-        bars += `<rect x="${cx + gap / 2}" y="${padT + ch - hExp}"
-          width="${barW}" height="${hExp}" fill="#f5a3a3" rx="1.5"/>`;
-      }
-
-      bars += `<text x="${cx}" y="${H - 8}" text-anchor="middle"
-        font-size="10" fill="#999">${d.label}</text>`;
-    });
-
-    return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
-      ${grid}
-      <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
-      ${bars}
-    </svg>`;
+return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="${incGradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7dd6a4"/>
+      <stop offset="100%" stop-color="#b8ead0"/>
+    </linearGradient>
+    <linearGradient id="${expGradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5a3a3"/>
+      <stop offset="100%" stop-color="#fad0d0"/>
+    </linearGradient>
+  </defs>
+  ${grid}
+  <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
+  ${bars}
+</svg>`;
   }
 
   function buildTrendData(year) {

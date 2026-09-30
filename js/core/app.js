@@ -45,22 +45,52 @@
     if (m && m.mounted) m.mounted(ctx);
   }
 
-  App.render = function () {
-    const route = Router.parse();
-    const ctx = {
-      id: route.id,
-      arg: route.arg,
-      go: Router.go,
-      refresh: App.render
-    };
+App.render = function () {
+  const route = Router.parse();
+  const ctx = {
+    id: route.id,
+    arg: route.arg,
+    go: Router.go,
+    refresh: App.render
+  };
 
-    renderSidebar(route.id);
-    topbarTitle.textContent = getTitle(route.id);
-    content.innerHTML = buildHtml(route.id, ctx);
+  renderSidebar(route.id);
+  topbarTitle.textContent = getTitle(route.id);
+
+  // 骨架屏：先画一帧占位，再替换
+  content.innerHTML = `<div class="skeleton-wrap">
+    <div class="sk-card">
+      <div class="sk-line w40 tall"></div>
+      <div class="sk-line w80"></div>
+      <div class="sk-line w60"></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk-line w60 tall"></div>
+      <div class="sk-line w100"></div>
+      <div class="sk-line w80"></div>
+      <div class="sk-line w40"></div>
+    </div>
+  </div>`;
+
+  requestAnimationFrame(() => {
+    content.innerHTML = `<div class="module-wrap module-${route.id}">${
+      buildHtml(route.id, ctx)
+    }</div>`;
     mount(route.id, ctx);
 
-    document.body.classList.remove('sidebar-open');
-  };
+    // 处理挂起的动作（快捷菜单用）
+    if (App._pendingAction && App._pendingAction.id === route.id) {
+      const { act } = App._pendingAction;
+      App._pendingAction = null;
+      const fakeEl = document.createElement('button');
+      fakeEl.dataset.act = act;
+      fakeEl.dataset._synthetic = '1';
+      setTimeout(() => dispatch(act, fakeEl, 'click'), 30);
+    }
+  });
+
+  document.body.classList.remove('sidebar-open');
+};
 
   function dispatch(act, el, type) {
     const route = Router.parse();
@@ -76,7 +106,7 @@ if (route.id === 'home') {
     const m = Registry.get(targetId);
     if (m && m.handleAction) return m.handleAction(act, el, { ...ctx, id: targetId }, type);
   }
-  if (HomeView.handleAction) return HomeView.handleAction(act, el, ctx, type);  // ← 加这行
+  if (HomeView.handleAction) return HomeView.handleAction(act, el, ctx, type);   // ← 加这行
   return false;
 }
     const m = Registry.get(route.id);
@@ -118,9 +148,94 @@ if (route.id === 'home') {
         App.render();
       });
     });
+    /* ---- 长按 FAB 显示快捷菜单 ---- */
+(function bindFabLongPress() {
+  let timer = null;
+  let started = false;
 
+  function onStart(e) {
+    const fab = e.target.closest && e.target.closest('.fab');
+    if (!fab) return;
+    started = true;
+    timer = setTimeout(() => {
+      if (!started) return;
+      App.showQuickSheet();
+      // 阻止后续 click
+      started = false;
+      e.preventDefault && e.preventDefault();
+    }, 550);
+  }
+  function onEnd() {
+    started = false;
+    clearTimeout(timer);
+  }
+
+  document.addEventListener('touchstart', onStart, { passive: true });
+  document.addEventListener('touchend', onEnd);
+  document.addEventListener('touchcancel', onEnd);
+  document.addEventListener('mousedown', onStart);
+  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('mouseleave', onEnd);
+})();
     Router.start(App.render);
   };
+  /* ---- 快捷菜单 ---- */
+App.showQuickSheet = function () {
+  const old = document.getElementById('quickSheet');
+  if (old) old.remove();
 
+  const actions = [
+    { id: 'ledger',   act: 'ledger-add',   cls: 'ledger',   icon: '💰', label: '记一笔' },
+    { id: 'habit',    act: 'habit-add',    cls: 'habit',    icon: '✅', label: '加打卡' },
+    { id: 'weight',   act: 'weight-add',   cls: 'weight',   icon: '⚖️', label: '记体重' },
+    { id: 'event',    act: 'event-add',    cls: 'event',    icon: '📌', label: '记事件' },
+    { id: 'wishlist', act: 'wish-add',     cls: 'wishlist', icon: '⭐', label: '加愿望' },
+    { id: 'habit',    act: null,           cls: 'habit',    icon: '📊', label: '打卡汇总' },
+    { id: 'ledger',   act: null,           cls: 'ledger',   icon: '📈', label: '看统计' },
+    { id: 'settings', act: null,           cls: '',         icon: '⚙️', label: '设置' }
+  ];
+
+  const mask = document.createElement('div');
+  mask.className = 'quick-sheet-mask';
+  mask.id = 'quickSheet';
+  mask.innerHTML = `
+    <div class="quick-sheet">
+      <div class="quick-handle"></div>
+      <div class="quick-title">快捷操作</div>
+      <div class="quick-grid">
+        ${actions.map(a => `
+          <button class="quick-item ${a.cls}" data-qid="${a.id}" data-qact="${a.act || ''}">
+            <span class="quick-item-icon">${a.icon}</span>
+            <span class="quick-item-label">${a.label}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+  document.body.appendChild(mask);
+  requestAnimationFrame(() => mask.classList.add('show'));
+
+  mask.addEventListener('click', e => {
+    if (e.target === mask) { closeQuick(); return; }
+    const btn = e.target.closest('[data-qid]');
+    if (!btn) return;
+    const id = btn.dataset.qid;
+    const act = btn.dataset.qact;
+    closeQuick();
+    if (act) {
+      App._pendingAction = { id, act };
+    } else {
+      App._pendingAction = null;
+    }
+    Router.go(id);
+    if (Router.current() === id) App.render();
+  });
+
+  function closeQuick() {
+    mask.classList.remove('show');
+    setTimeout(() => {
+      if (mask.parentNode) mask.parentNode.removeChild(mask);
+    }, 220);
+  }
+};
   global.App = App;
 })(window);

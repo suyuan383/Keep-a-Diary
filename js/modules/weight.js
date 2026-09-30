@@ -263,15 +263,23 @@
         text-anchor="middle" font-size="10" fill="#999">${p.label || ''}</text>`;
     });
 
-    return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
-      ${grid}
-      <polygon points="${area}" fill="${color}" fill-opacity="0.08"/>
-      ${targetHtml}
-      <polyline points="${points}" fill="none" stroke="${color}"
-        stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      ${dots}
-      ${xLabels}
-    </svg>`;
+const gradId = 'g_' + Math.random().toString(36).slice(2, 8);
+return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${color}" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  ${grid}
+  <polygon points="${area}" fill="url(#${gradId})"/>
+  ${targetHtml}
+  <polyline points="${points}" fill="none" stroke="${color}"
+    stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"
+    style="filter: drop-shadow(0 2px 4px ${color}33)"/>
+  ${dots}
+  ${xLabels}
+</svg>`;
   }
 
   /* =========================================================
