@@ -70,14 +70,15 @@
       return SettingsView.handleAction &&
              SettingsView.handleAction(act, el, ctx, type);
     }
-    if (route.id === 'home') {
-      const targetId = el.dataset.module;
-      if (targetId) {
-        const m = Registry.get(targetId);
-        if (m && m.handleAction) return m.handleAction(act, el, { ...ctx, id: targetId }, type);
-      }
-      return false;
-    }
+if (route.id === 'home') {
+  const targetId = el.dataset.module;
+  if (targetId) {
+    const m = Registry.get(targetId);
+    if (m && m.handleAction) return m.handleAction(act, el, { ...ctx, id: targetId }, type);
+  }
+  if (HomeView.handleAction) return HomeView.handleAction(act, el, ctx, type);  // ← 加这行
+  return false;
+}
     const m = Registry.get(route.id);
     if (m && m.handleAction) return m.handleAction(act, el, ctx, type);
     return false;
@@ -98,6 +99,7 @@
     mask = document.getElementById('sidebarMask');
 
     Store.init();
+    if (global.Theme) Theme.init();   // ← 加这行
 
     bindDelegate('click', 'click');
     bindDelegate('change', 'change');

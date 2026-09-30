@@ -387,3 +387,79 @@
     border-right: 1px solid rgba(255, 255, 255, 0.6) !important;
   }
 }
+/* ============ 主页文字编辑 ============ */
+.home-greeting {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  transition: opacity .15s ease;
+  user-select: none;
+}
+.home-greeting:active { opacity: .75; }
+
+.home-greeting-text {
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.home-edit-icon {
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity .2s ease;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.home-greeting:hover .home-edit-icon { opacity: .55; }
+@media (hover: none) {
+  .home-edit-icon { opacity: .35; }
+}
+
+/* 长文本自动缩字号 */
+.home-greeting.long { font-size: 19px; }
+.home-greeting.xlong { font-size: 16px; }
+/* ============ 主题选择 ============ */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.theme-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.theme-item:active { transform: scale(.95); }
+.theme-item.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.theme-dot {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+.theme-name {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.theme-item.active .theme-name {
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+.theme-check {
+  position: absolute;
+  top: 6px; right: 8px;
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 700;
+}
