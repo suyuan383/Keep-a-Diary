@@ -93,8 +93,14 @@ App.render = function () {
 };
 
   function dispatch(act, el, type) {
-    const route = Router.parse();
-    const ctx = { id: route.id, arg: route.arg, go: Router.go, refresh: App.render };
+  // 全局快捷菜单：任意页面都能触发
+  if (act === 'app-quick-menu') {
+    App.showQuickSheet();
+    return true;
+  }
+
+  const route = Router.parse();
+  const ctx = { id: route.id, arg: route.arg, go: Router.go, refresh: App.render };
 
     if (route.id === 'settings') {
       return SettingsView.handleAction &&
@@ -148,35 +154,6 @@ if (route.id === 'home') {
         App.render();
       });
     });
-    /* ---- 长按 FAB 显示快捷菜单 ---- */
-(function bindFabLongPress() {
-  let timer = null;
-  let started = false;
-
-  function onStart(e) {
-    const fab = e.target.closest && e.target.closest('.fab');
-    if (!fab) return;
-    started = true;
-    timer = setTimeout(() => {
-      if (!started) return;
-      App.showQuickSheet();
-      // 阻止后续 click
-      started = false;
-      e.preventDefault && e.preventDefault();
-    }, 550);
-  }
-  function onEnd() {
-    started = false;
-    clearTimeout(timer);
-  }
-
-  document.addEventListener('touchstart', onStart, { passive: true });
-  document.addEventListener('touchend', onEnd);
-  document.addEventListener('touchcancel', onEnd);
-  document.addEventListener('mousedown', onStart);
-  document.addEventListener('mouseup', onEnd);
-  document.addEventListener('mouseleave', onEnd);
-})();
     Router.start(App.render);
   };
   /* ---- 快捷菜单 ---- */
@@ -190,8 +167,8 @@ App.showQuickSheet = function () {
     { id: 'weight',   act: 'weight-add',   cls: 'weight',   icon: '⚖️', label: '记体重' },
     { id: 'event',    act: 'event-add',    cls: 'event',    icon: '📌', label: '记事件' },
     { id: 'wishlist', act: 'wish-add',     cls: 'wishlist', icon: '⭐', label: '加愿望' },
-    { id: 'habit',    act: null,           cls: 'habit',    icon: '📊', label: '打卡汇总' },
-    { id: 'ledger',   act: null,           cls: 'ledger',   icon: '📈', label: '看统计' },
+    // { id: 'habit',    act: null,           cls: 'habit',    icon: '📊', label: '打卡汇总' },
+    // { id: 'ledger',   act: null,           cls: 'ledger',   icon: '📈', label: '看统计' },
     { id: 'settings', act: null,           cls: '',         icon: '⚙️', label: '设置' }
   ];
 

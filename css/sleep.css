@@ -1,0 +1,204 @@
+/* =====================================================
+   睡眠记录
+   ===================================================== */
+.sleep-module { position: relative; padding-bottom: 72px; }
+
+/* ---------- 范围切换 ---------- */
+.sleep-range-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.sleep-range-title {
+  font-weight: 600; font-size: 15px;
+  flex: 1; text-align: center;
+}
+.sleep-range-right { display: flex; gap: 6px; align-items: center; }
+
+/* ---------- 图表 ---------- */
+.sleep-chart-card { padding: 14px; }
+.sleep-chart { width: 100%; height: auto; display: block; }
+
+.sleep-legend {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-3);
+}
+.sleep-legend .dot-sleep,
+.sleep-legend .dot-wake {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  margin-right: 2px;
+}
+.sleep-legend .dot-sleep { background: #7c5cbf; }
+.sleep-legend .dot-wake  { background: #f0a020; margin-left: 8px; }
+
+.sleep-chart-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line-soft);
+}
+
+/* ---------- 统计 ---------- */
+.sleep-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sleep-stat {
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(255,255,255,.6);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 6px;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 4px;
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+.sleep-stat-label {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.sleep-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sleep-stats-more {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  padding-top: 4px;
+}
+
+/* ---------- 记录列表 ---------- */
+.sleep-list { display: flex; flex-direction: column; gap: 10px; }
+
+.sleep-item {
+  background: rgba(255,255,255,.72);
+  border: 1px solid rgba(255,255,255,.6);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  transition: box-shadow .2s ease;
+}
+.sleep-item:hover { box-shadow: var(--shadow); }
+
+.sleep-item-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.sleep-item-date {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.sleep-item-menu {
+  border: none; background: transparent;
+  color: var(--text-3); font-size: 18px;
+  padding: 2px 8px; cursor: pointer;
+  line-height: 1;
+}
+
+.sleep-item-main {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 8px;
+}
+.sleep-time {
+  font-size: 18px;
+  font-weight: 700;
+  color: #5a4a9a;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .5px;
+}
+.sleep-arrow {
+  color: var(--text-3);
+  font-size: 14px;
+}
+.sleep-dur {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #785fa3;
+  background: #f0ebf8;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.sleep-chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.sleep-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f0ebf8;
+  color: #785fa3;
+  font-weight: 500;
+}
+
+.sleep-nap {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line-soft);
+  font-size: 12px;
+  color: var(--text-2);
+  display: flex; align-items: center; gap: 6px;
+}
+.sleep-nap-dur {
+  margin-left: auto;
+  font-size: 11px;
+  color: #c47a2f;
+  background: #fcefdf;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+/* ---------- 主页卡片 ---------- */
+.sleep-home-body { padding-top: 4px; }
+.sleep-home-row {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 6px;
+}
+.sleep-home-time {
+  font-size: 20px;
+  font-weight: 700;
+  color: #5a4a9a;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .5px;
+}
+.sleep-home-arrow {
+  color: var(--text-3);
+  font-size: 14px;
+}
+.sleep-home-dur {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #785fa3;
+  background: #f0ebf8;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.sleep-home-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.sleep-home-sub b {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.sleep-home-nap {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c47a2f;
+}

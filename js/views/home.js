@@ -25,7 +25,7 @@
         </div>
         ${renderOverview()}
         <div class="home-cards">${cards}</div>
-        <button class="fab" aria-label="快捷操作">+</button>
+      <button class="fab" data-act="app-quick-menu" aria-label="快捷操作">+</button>
       </div>`;
     },
 
