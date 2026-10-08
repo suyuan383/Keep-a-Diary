@@ -1,3 +1,4 @@
+let listLimit = 10;   // 列表默认显示条数
 (function () {
   const KEY = 'sleep';
   let viewRange = 'week';   // week | month | year
@@ -123,17 +124,24 @@
       if (sh != null) { minH = Math.min(minH, sh); maxH = Math.max(maxH, sh); }
       if (wh != null) { minH = Math.min(minH, wh); maxH = Math.max(maxH, wh); }
     });
+
+    // 计划线：23:00（= 从 18:00 起算 5 小时）
+    const planHour = 23;
+    const planH = timeToHours(U.pad(planHour) + ':00');
+    minH = Math.min(minH, planH);
+    maxH = Math.max(maxH, planH);
+
     if (!isFinite(minH)) { minH = 4; maxH = 14; }
     minH = Math.floor(minH - 1);
     maxH = Math.ceil(maxH + 1);
     if (maxH - minH < 6) maxH = minH + 6;
 
-    const yScale = h => padT + ((h - minH) / (maxH - minH)) * ch;
+  const yScale = h => padT + ((maxH - h) / (maxH - minH)) * ch;
     const xScale = i => series.length === 1
       ? padL + cw / 2
       : padL + (i / (series.length - 1)) * cw;
 
-    // 网格 + Y 轴
+    // 网格 + Y 轴刻度
     let grid = '';
     const steps = 4;
     for (let i = 0; i <= steps; i++) {
@@ -145,7 +153,21 @@
         font-size="9" fill="#a8b3c1">${hoursToTime(hVal)}</text>`;
     }
 
-    // 每日柱子
+    // 23:00 计划红线
+    const planY = yScale(planH);
+    const planLine = `
+      <line x1="${padL}" y1="${planY}" x2="${W - padR}" y2="${planY}"
+        stroke="#e35d5d" stroke-width="1.4" stroke-dasharray="5 3" opacity="0.8"/>
+      <rect x="${padL + 2}" y="${planY - 14}" width="62" height="14"
+        rx="4" fill="#e35d5d" opacity="0.94"/>
+      <text x="${padL + 6}" y="${planY - 4}"
+        font-size="9" fill="#fff" font-weight="600">23:00 计划</text>
+    `;
+
+    // 每日柱子：三档颜色
+    //   < 6h      深红
+    //   6h ~ <7h  橙
+    //   >= 7h     绿
     const barW = Math.max(10, Math.min(26, cw / series.length * 0.55));
     let bars = '';
     series.forEach((s, i) => {
@@ -157,8 +179,39 @@
       const x = xScale(i) - barW / 2;
       const y = Math.min(y1, y2);
       const h = Math.max(3, Math.abs(y2 - y1));
-      bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}"
-        rx="4" fill="url(#sleepGrad)"/>`;
+
+      // 时长：优先手环总睡眠，否则用入睡→醒来差值
+      const dur = (s.totalSleep != null && isFinite(s.totalSleep))
+        ? s.totalSleep
+        : durationHours(s.sleepTime, s.wakeTime);
+
+      let gradId;
+      if (dur == null) gradId = 'sleepBarGreen';
+      else if (dur < 6) gradId = 'sleepBarDeepRed';
+      else if (dur < 7) gradId = 'sleepBarOrange';
+      else gradId = 'sleepBarGreen';
+
+            bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}"
+        rx="4" fill="url(#${gradId})"/>`;
+
+      // 柱体上显示时长
+      if (dur != null && h >= 22) {
+        let durText = '';
+        if (barW >= 22) {
+          const hh = Math.floor(dur);
+          const mm = Math.round((dur - hh) * 60);
+          durText = hh + 'h' + (mm ? String(mm).padStart(2, '0') : '');
+        } else if (barW >= 14) {
+          durText = Math.round(dur) + 'h';
+        }
+        if (durText) {
+          bars += `<text x="${xScale(i)}" y="${y + h / 2 + 3.5}"
+            text-anchor="middle" font-size="9" font-weight="700"
+            fill="#ffffff"
+            style="paint-order: stroke; stroke: rgba(0,0,0,0.32); stroke-width: 2.5px;"
+            >${durText}</text>`;
+        }
+      }
     });
 
     // 折线（入睡 + 醒来）
@@ -182,7 +235,7 @@
         stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
     }
 
-    // 圆点
+    // 数据点
     let dots = '';
     series.forEach((s, i) => {
       const sh = timeToHours(s.sleepTime);
@@ -205,19 +258,27 @@
 
     return `<svg viewBox="0 0 ${W} ${H}" class="chart sleep-chart" preserveAspectRatio="xMidYMid meet">
       <defs>
-        <linearGradient id="sleepGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#7c5cbf" stop-opacity="0.5"/>
-          <stop offset="100%" stop-color="#7c5cbf" stop-opacity="0.12"/>
+        <linearGradient id="sleepBarGreen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6fce9e" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#b8ead0" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="sleepBarOrange" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e8a33d" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#fad9a3" stop-opacity="0.3"/>
+        </linearGradient>
+        <linearGradient id="sleepBarDeepRed" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#d96a6a" stop-opacity="0.95"/>
+          <stop offset="100%" stop-color="#f0b8b8" stop-opacity="0.35"/>
         </linearGradient>
       </defs>
       ${grid}
+      ${planLine}
       ${bars}
       ${lines}
       ${dots}
       ${xLabels}
     </svg>`;
   }
-
   /* =========================================================
      序列化（跨天/跨范围）
      ========================================================= */
@@ -344,6 +405,13 @@
       /* 范围切换 */
       if (act === 'sleep-range') {
         viewRange = el.dataset.range;
+        listLimit = 10;
+        ctx.refresh();
+        return true;
+      }
+            /* 加载更多 */
+      if (act === 'sleep-load-more') {
+        listLimit += 20;
         ctx.refresh();
         return true;
       }
@@ -355,11 +423,13 @@
         else if (viewRange === 'month') a.setMonth(a.getMonth() + dir);
         else a.setFullYear(a.getFullYear() + dir);
         anchorDate = a;
+        listLimit = 10;
         ctx.refresh();
         return true;
       }
       if (act === 'sleep-now') {
         anchorDate = new Date();
+        listLimit = 10;
         ctx.refresh();
         return true;
       }
@@ -391,15 +461,16 @@
   function renderPage() {
     const range = getRange(viewRange, getAnchor());
     const recs = recordsInRange(range);
-    const series = recs.map(r => ({
-      date: r.date,
-      label: (() => {
-        const d = parseDate(r.date);
-        return (d.getMonth() + 1) + '/' + d.getDate();
-      })(),
-      sleepTime: r.sleepTime,
-      wakeTime: r.wakeTime
-    }));
+const series = recs.map(r => ({
+  date: r.date,
+  label: (() => {
+    const d = parseDate(r.date);
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  })(),
+  sleepTime: r.sleepTime,
+  wakeTime: r.wakeTime,
+  totalSleep: r.totalSleep
+}));
 
     const rangeSwitcher = `
       <div class="tabs">
@@ -418,18 +489,26 @@
         </div>
       </div>`;
 
-    const chart = `
-      <div class="chart-card sleep-chart-card">
-        <div class="chart-title">
-          <span>入睡 / 醒来时间</span>
-          <span class="sleep-legend">
-            <i class="dot-sleep"></i>入睡
-            <i class="dot-wake"></i>醒来
-          </span>
-        </div>
-        ${buildSleepChart(series)}
-        <div class="sleep-chart-hint">柱 = 整晚睡眠段 · 线 = 每日入睡/醒来时间变化</div>
-      </div>`;
+const chart = `
+  <div class="chart-card sleep-chart-card">
+    <div class="chart-title">
+      <span>入睡 / 醒来时间</span>
+      <span class="sleep-legend">
+        <i class="dot-sleep"></i>入睡
+        <i class="dot-wake"></i>醒来
+      </span>
+    </div>
+    ${buildSleepChart(series)}
+    <div class="sleep-chart-hint">
+      柱 = 整晚睡眠段 · 线 = 每日入睡/醒来时间
+    </div>
+    <div class="sleep-chart-hint sleep-chart-legend">
+      <span><i class="hint-dot green"></i>7h 及以上</span>
+      <span><i class="hint-dot orange"></i>6~7h</span>
+      <span><i class="hint-dot deepred"></i>少于 6h</span>
+      <span><i class="hint-dash"></i>23:00 计划</span>
+    </div>
+  </div>`;
 
     const stats = renderStats(recs);
     const list = renderList(recs);
@@ -485,10 +564,21 @@
 
     // 倒序：最新在上
     const sorted = recs.slice().sort((a, b) => b.date.localeCompare(a.date));
+    const shown = sorted.slice(0, listLimit);
+    const hasMore = sorted.length > listLimit;
+    const remain = sorted.length - listLimit;
 
-    return `<div class="sleep-list">
-      ${sorted.map(r => renderItem(r)).join('')}
+    let html = `<div class="sleep-list">
+      ${shown.map(r => renderItem(r)).join('')}
     </div>`;
+
+    if (hasMore) {
+      html += `<button class="btn btn-ghost sleep-load-more" data-act="sleep-load-more">
+        显示更多 · 还有 ${remain} 条
+      </button>`;
+    }
+
+    return html;
   }
 
   function renderItem(r) {
