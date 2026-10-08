@@ -39,14 +39,17 @@
     return d[date];
   }
   function setDay(date, patch) {
-    Store.updateSilent(KEY, data => {
+    // 静默保存，不触发全局重渲染，避免页面跳顶
+    const updater = Store.updateSilent || Store.update;
+    updater.call(Store, KEY, data => {
       if (!data.days) data.days = {};
       if (!data.days[date]) {
         data.days[date] = { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
       }
       Object.assign(data.days[date], patch);
       const d = data.days[date];
-      const hasData = d.onPeriod || d.flow || (d.symptoms && d.symptoms.length) ||
+      const hasData = d.onPeriod || d.flow ||
+                      (d.symptoms && d.symptoms.length) ||
                       (d.mood && d.mood.length) || d.note;
       if (!hasData) delete data.days[date];
       return data;
@@ -93,7 +96,7 @@
         const last = parseDate(cur.endDate);
         const thisD = parseDate(date);
         const diff = daysBetween(last, thisD);
-        // 连续或间隔 <= 2 天算同一次经期（防止漏记一天）
+        // 连续或间隔 <= 2 天算同一次经期
         if (diff <= 2) {
           cur.endDate = date;
           cur.days.push(date);
@@ -168,11 +171,9 @@
     const daysSinceLast = daysBetween(lastStart, today);
     const daysToNext = nextStart ? daysBetween(today, nextStart) : null;
 
-    // 今天是否处于经期中（endDate 是今天或之后，startDate 是今天或之前）
     const isOnPeriod = today >= lastStart && today <= lastEnd;
     const periodDay = isOnPeriod ? daysBetween(lastStart, today) + 1 : null;
 
-    // 今天是否有记录
     const todayKey = dateStr(today);
     const todayData = getDay(todayKey);
 
@@ -278,7 +279,7 @@
         return true;
       }
 
-      /* --- 点日期：切换选中 → 局部更新，不重渲染 --- */
+      /* --- 点日期：切换选中，局部更新 --- */
       if (act === 'period-day-click') {
         const date = el.dataset.date;
         handleDayClick(date);
@@ -291,15 +292,20 @@
         const day = ensureDay(date);
         day.onPeriod = !day.onPeriod;
         setDay(date, { onPeriod: day.onPeriod });
-        const cell = document.querySelector(`[data-date="${date}"]`);
+
+        // 更新格子视觉
+        const cell = document.querySelector(`.period-cell[data-date="${date}"]`);
         if (cell) {
           cell.classList.toggle('actual', day.onPeriod);
           if (day.onPeriod) cell.classList.remove('has-note');
         }
+
+        // 更新开关视觉
         const toggle = el.closest('.period-toggle');
         if (toggle) toggle.classList.toggle('active', day.onPeriod);
-        // 只切换流量区的显示，不重渲染整个面板（避免丢焦点）
-        const flowSection = document.querySelector('.period-detail-section.flow-section');
+
+        // 只切换流量区的显示，不重渲染（避免丢焦点）
+        const flowSection = document.querySelector('.flow-section');
         if (flowSection) {
           flowSection.style.display = day.onPeriod ? '' : 'none';
         }
@@ -311,9 +317,14 @@
         const date = el.dataset.date;
         const id = el.dataset.id;
         const cur = getDay(date) || {};
-        const next = cur.flow === id ? null : id;   // 再点一次取消
+        const next = cur.flow === id ? null : id;
         setDay(date, { flow: next });
-        refreshDetailBody();
+
+        // 局部更新按钮状态
+        document.querySelectorAll(`.flow-btn[data-date="${date}"]`).forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.id === next);
+        });
+        markCellHasNote(date);
         return true;
       }
 
@@ -325,7 +336,6 @@
         const next = cur.includes(val) ? cur.filter(x => x !== val) : cur.concat(val);
         setDay(date, { symptoms: next });
         markCellHasNote(date);
-        // 只更新那个 chip
         el.classList.toggle('active');
         return true;
       }
@@ -357,7 +367,7 @@
         return true;
       }
 
-      /* --- 历史点进日历 --- */
+      /* --- 历史跳回日历 --- */
       if (act === 'period-goto-date') {
         const date = el.dataset.date;
         const d = parseDate(date);
@@ -473,12 +483,10 @@
     const offset = (firstDay.getDay() + 6) % 7;
     const todayStr = U.todayStr();
 
-    // 收集所有实际经期日
     const days = getData().days;
     const actualDays = {};
     Object.keys(days).forEach(d => { if (days[d].onPeriod) actualDays[d] = true; });
 
-    // 预测日
     const predDays = {};
     if (p && p.nextStart && p.nextEnd) {
       let cur = p.nextStart;
@@ -489,16 +497,19 @@
     }
 
     let cells = '';
-    for (let i = 0; i < offset; i++) cells += `<div class="period-cell empty"></div>`;
+    // 注意：空格子用 is-blank 而不是 empty，避免与全局 .empty 样式冲突
+    for (let i = 0; i < offset; i++) cells += `<div class="period-cell is-blank"></div>`;
     for (let d = 1; d <= dim; d++) {
       const ds = U.todayStr(new Date(year, month, d));
       const dayData = days[ds];
       let cls = 'period-cell';
       if (actualDays[ds]) cls += ' actual';
       else if (predDays[ds]) cls += ' predicted';
-      else if (dayData && (dayData.symptoms && dayData.symptoms.length ||
-                            dayData.mood && dayData.mood.length ||
-                            dayData.flow || dayData.note)) {
+      else if (dayData && (
+        (dayData.symptoms && dayData.symptoms.length) ||
+        (dayData.mood && dayData.mood.length) ||
+        dayData.flow || dayData.note
+      )) {
         cls += ' has-note';
       }
       if (ds === todayStr) cls += ' today';
@@ -559,7 +570,8 @@
     const day = getDay(date) || { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
     const onPeriod = !!day.onPeriod;
 
-        const flowRow = `
+    // 流量区永远渲染，用 display 控制显示，避免切换时 DOM 重建丢焦点
+    const flowRow = `
       <div class="period-detail-section flow-section" style="${onPeriod ? '' : 'display:none'}">
         <div class="period-detail-label">流量</div>
         <div class="flow-row">
@@ -598,7 +610,7 @@
     const noteRow = `
       <div class="period-detail-section">
         <div class="period-detail-label">备注</div>
-        <textarea class="ev-form-textarea" rows="2"
+        <textarea class="period-note-input" rows="2"
           placeholder="想记点什么…"
           data-act="period-note-blur" data-date="${date}">${U.escape(day.note || '')}</textarea>
       </div>`;
@@ -608,15 +620,13 @@
 
   /* ============ 局部更新 ============ */
   function handleDayClick(date) {
-    // 切换选中状态
     selectedDate = (selectedDate === date) ? null : date;
 
-    // 更新格子高亮
+    // 更新所有格子的选中状态
     document.querySelectorAll('.period-cell').forEach(el => {
       el.classList.toggle('selected', el.dataset.date === selectedDate);
     });
 
-    // 更新详情面板
     const detail = document.getElementById('period-detail');
     if (!detail) return;
     if (!selectedDate) {
@@ -628,20 +638,10 @@
     }
   }
 
-  function refreshDetailBody() {
-    const body = document.getElementById('period-detail-body');
-    if (!body || !selectedDate) return;
-    body.innerHTML = renderDetailBody(selectedDate);
-  }
-
-  function updateFlowVisibility() {
-    // 已经被 refreshDetailBody 覆盖，保留占位
-  }
-
   function markCellHasNote(date) {
-    const cell = document.querySelector(`[data-date="${date}"]`);
+    const cell = document.querySelector(`.period-cell[data-date="${date}"]`);
     if (!cell) return;
-    if (cell.classList.contains('actual')) return;  // 已经在经期色里
+    if (cell.classList.contains('actual')) return;
     const day = getDay(date) || {};
     const hasNote = day.onPeriod || day.flow ||
                     (day.symptoms && day.symptoms.length) ||
@@ -722,7 +722,6 @@
       ${renderSymptomStats()}`;
   }
 
-  /* 症状统计（基于每天的记录） */
   function renderSymptomStats() {
     const days = getData().days;
     const symCount = {};

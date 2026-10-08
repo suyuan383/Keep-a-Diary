@@ -50,8 +50,7 @@
       save();
       return DB[key];
     },
-        // 只写磁盘，不触发 store:change 广播（用于局部更新）
-    updateSilent(key, fn) {
+        updateSilent(key, fn) {
       const cur = DB[key];
       const next = fn(cur);
       DB[key] = next === undefined ? cur : next;

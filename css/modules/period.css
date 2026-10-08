@@ -92,6 +92,7 @@
   box-shadow: var(--shadow); padding: 12px;
   margin-bottom: 12px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* 星期行和日期主体共用同一套 grid 规则，保证对齐 */
@@ -101,6 +102,13 @@
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   box-sizing: border-box;
+  width: 100%;
+}
+
+/* 关键：让 1fr 可以压缩到比内容更小 */
+.period-cal-week > *,
+.period-cal-body > * {
+  min-width: 0;
 }
 
 .period-cal-week {
@@ -121,8 +129,14 @@
   position: relative;
   cursor: pointer;
   transition: background .15s ease;
+  overflow: hidden;
 }
-.period-cell.empty { background: transparent; cursor: default; }
+
+/* 空格子 */
+.period-cell.is-blank {
+  background: transparent;
+  cursor: default;
+}
 
 .period-cell.actual {
   background: #f8b6c9; color: #fff; font-weight: 700;
@@ -145,7 +159,7 @@
   width: 4px; height: 4px; border-radius: 50%;
   background: #785fa3;
 }
-.period-cell.actual::after { display: none; }  /* 经期格子不显示小点 */
+.period-cell.actual::after { display: none; }
 
 .period-cell.selected {
   outline: 2.5px solid #e88ea8;
@@ -411,7 +425,7 @@
 }
 
 /* 备注输入框 */
-#period-detail .ev-form-textarea {
+.period-note-input {
   width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--line);
@@ -423,8 +437,9 @@
   box-sizing: border-box;
   resize: vertical;
   font-family: inherit;
+  min-height: 44px;
 }
-#period-detail .ev-form-textarea:focus {
+.period-note-input:focus {
   border-color: var(--primary);
   background: #fff;
 }
