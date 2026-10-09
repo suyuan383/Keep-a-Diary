@@ -221,3 +221,65 @@
   cursor: pointer;
   margin-top: 4px;
 }
+/* ============ 紧凑视图 ============ */
+.ck-compact-list {
+  display: flex; flex-direction: column;
+  gap: 0;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.ck-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: background .15s ease;
+  border-bottom: 1px solid var(--line-soft);
+  user-select: none;
+}
+.ck-compact-row:last-child { border-bottom: none; }
+.ck-compact-row:active { background: #f0f4f1; }
+.ck-compact-row.checked { background: var(--primary-soft); }
+
+.ck-compact-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.ck-compact-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ck-compact-sep {
+  color: var(--text-3);
+  margin: 0 4px;
+}
+.ck-compact-acc {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.ck-compact-check {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid #ccd2d9;
+  background: #fff;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  color: #fff;
+  transition: all .15s ease;
+}
+.ck-compact-row.checked .ck-compact-check {
+  background: var(--primary);
+  border-color: var(--primary);
+}

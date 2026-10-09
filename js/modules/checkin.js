@@ -117,26 +117,54 @@
         return true;
       }
 
-      /* 关键：点账户行 → 一键切换今日打卡（局部更新，不重渲染） */
+      /* 点账户行 → 一键切换今日打卡 */
       if (act === 'ck-toggle') {
         const { gameId, accId } = el.dataset;
         toggleCheck(gameId, accId);
 
+        const date = todayStr();
+        const g = getData().games.find(x => x.id === gameId);
+        const a = g && g.accounts.find(x => x.id === accId);
+        const checked = a && isChecked(a, date);
+
+        // 紧凑视图：整行淡出移除
+        const compactRow = el.closest('.ck-compact-row');
+        if (compactRow) {
+          compactRow.classList.add('checked');
+          const check = compactRow.querySelector('.ck-compact-check');
+          if (check) check.textContent = '✓';
+          // 等 300ms 让视觉反馈被看到，再把这行从 DOM 移除
+          setTimeout(() => {
+            compactRow.style.transition = 'opacity .22s ease, height .25s ease, margin .25s ease, padding .25s ease';
+            compactRow.style.opacity = '0';
+            compactRow.style.height = '0';
+            compactRow.style.marginBottom = '0';
+            compactRow.style.paddingTop = '0';
+            compactRow.style.paddingBottom = '0';
+            setTimeout(() => {
+              compactRow.remove();
+              // 如果全部打完了，显示"都完成啦"
+              const remain = document.querySelectorAll('.ck-compact-row').length;
+              if (remain === 0) {
+                const list = document.querySelector('.ck-compact-list');
+                if (list) {
+                  list.outerHTML = `<div class="empty" data-emoji="✨">今天的签到都完成啦</div>`;
+                }
+              }
+            }, 260);
+          }, 220);
+          return true;
+        }
+
+        // 卡片视图：原来的行内更新
         const row = el.closest('.ck-acc-row');
         if (row) {
-          const date = todayStr();
-          const g = getData().games.find(x => x.id === gameId);
-          const a = g && g.accounts.find(x => x.id === accId);
-          const checked = a && isChecked(a, date);
           row.classList.toggle('checked', checked);
           const mark = row.querySelector('.ck-check');
           if (mark) mark.textContent = checked ? '✓' : '';
           const status = row.querySelector('.ck-status');
           if (status) status.textContent = checked ? '已签' : '未签';
         }
-
-        // 更新卡片头部计数
-        const g = getData().games.find(x => x.id === gameId);
         if (g) {
           const s = gameStats(g);
           const countEl = document.querySelector(`[data-game-count="${gameId}"]`);
@@ -179,17 +207,48 @@
       </div>`;
     }
 
-    let games = data.games;
+    // 紧凑视图：把所有"今天没签完"的账户拍平成一列
     if (viewFilter === 'todo') {
-      games = games.filter(g => {
-        const s = gameStats(g);
-        return s.total === 0 || s.done < s.total;
+      const pending = [];
+      data.games.forEach(g => {
+        (g.accounts || []).forEach(a => {
+          if (!isChecked(a, todayStr())) {
+            pending.push({ game: g, acc: a });
+          }
+        });
       });
+
+      const listHtml = pending.length
+        ? `<div class="ck-compact-list">
+            ${pending.map(({ game, acc }) => `
+              <div class="ck-compact-row" data-act="ck-toggle"
+                data-game-id="${game.id}" data-acc-id="${acc.id}">
+                <span class="ck-compact-icon">${U.escape(game.icon || '🎮')}</span>
+                <span class="ck-compact-name">
+                  ${U.escape(game.name)}
+                  <span class="ck-compact-sep">·</span>
+                  <span class="ck-compact-acc">${U.escape(acc.name)}</span>
+                </span>
+                <span class="ck-compact-check"></span>
+              </div>
+            `).join('')}
+          </div>`
+        : `<div class="empty" data-emoji="✨">今天的签到都完成啦</div>`;
+
+      return `<div class="module checkin-module">
+        ${head}
+        ${filterBar}
+        ${listHtml}
+      </div>`;
     }
 
-    const cardsHtml = games.length
-      ? games.map(g => renderGameCard(g)).join('')
-      : `<div class="empty" data-emoji="✨">今天的签到都完成啦</div>`;
+    // 全部视图：还是卡片
+    const cardsHtml = data.games.length
+      ? data.games.map(g => renderGameCard(g)).join('')
+      : `<div class="empty" data-emoji="🎮">
+          还没有添加游戏<br>
+          <button class="btn btn-primary" data-act="ck-add-game" style="margin-top:12px">+ 添加游戏</button>
+        </div>`;
 
     return `<div class="module checkin-module">
       ${head}
