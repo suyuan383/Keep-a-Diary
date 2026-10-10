@@ -1,6 +1,10 @@
 (function () {
   const KEY = 'checkin';
-  let viewFilter = 'all';  // all | todo
+
+  /* ============ 状态 ============ */
+  // 默认就是未完成，用户从主页/侧边栏进来第一眼看到的就是未签的
+  let viewFilter = 'todo';
+  let _lastHash = '';   // 用于检测是否从其他模块进入
 
   /* ============ 数据层 ============ */
   function getData() {
@@ -56,9 +60,10 @@
     order: 45,
     storageKey: KEY,
 
+    /* ---------------- 主页卡片：只显示未完成 ---------------- */
     homeCard() {
       const data = getData();
-      const { total, done } = todayStats();
+      const today = todayStr();
 
       if (!data.games.length) {
         return `<div class="card">
@@ -71,29 +76,73 @@
         </div>`;
       }
 
-      const rows = data.games.map(g => {
-        const s = gameStats(g);
-        const allDone = s.total > 0 && s.done === s.total;
-        return `<div class="ck-home-row">
-          <span class="ck-home-icon">${U.escape(g.icon || '🎮')}</span>
-          <span class="ck-home-name">${U.escape(g.name)}</span>
-          <span class="ck-home-count ${allDone ? 'done' : ''}">${s.done}/${s.total}</span>
+      // 收集未完成的账户
+      const pending = [];
+      data.games.forEach(g => {
+        (g.accounts || []).forEach(a => {
+          if (!isChecked(a, today)) {
+            pending.push({ game: g, acc: a });
+          }
+        });
+      });
+
+      const totalAccs = data.games.reduce((s, g) => s + (g.accounts || []).length, 0);
+      const doneAccs = totalAccs - pending.length;
+
+      // 全部签完
+      if (pending.length === 0) {
+        return `<div class="card">
+          <div class="card-head">
+            <span class="card-icon">🎮</span>
+            <span class="card-title">游戏签到</span>
+            <span class="card-sub">${doneAccs}/${totalAccs}</span>
+            <a class="card-more" href="#checkin">详情 ›</a>
+          </div>
+          <div class="ck-home-all-done">今天都签完啦 🎉</div>
         </div>`;
-      }).join('');
+      }
+
+      // 主页最多显示 5 条，避免卡片太长
+      const shown = pending.slice(0, 5);
+      const remain = pending.length - shown.length;
+
+      const rows = shown.map(({ game, acc }) => `
+        <div class="ck-home-row" data-act="ck-toggle" data-module="checkin"
+          data-game-id="${game.id}" data-acc-id="${acc.id}">
+          <span class="ck-home-icon">${U.escape(game.icon || '🎮')}</span>
+          <span class="ck-home-name">
+            ${U.escape(game.name)}
+            <span class="ck-home-sep">·</span>
+            <span class="ck-home-acc">${U.escape(acc.name)}</span>
+          </span>
+          <span class="ck-home-check"></span>
+        </div>
+      `).join('');
 
       return `<div class="card">
         <div class="card-head">
           <span class="card-icon">🎮</span>
           <span class="card-title">游戏签到</span>
-          <span class="card-sub">${done}/${total}</span>
+          <span class="card-sub">${doneAccs}/${totalAccs}</span>
           <a class="card-more" href="#checkin">详情 ›</a>
         </div>
         <div class="ck-home-list">${rows}</div>
+        ${remain > 0 ? `<a class="ck-home-more" href="#checkin">还有 ${remain} 个未签 ›</a>` : ''}
       </div>`;
     },
 
-    page() { return renderPage(); },
+    /* ---------------- 模块页面 ---------------- */
+    page(ctx) {
+      // 检测是否从其他模块进入：hash 变化时重置为"未完成"
+      const curHash = (location.hash || '#home').split('/')[0];
+      if (_lastHash !== curHash) {
+        viewFilter = 'todo';
+        _lastHash = curHash;
+      }
+      return renderPage();
+    },
 
+    /* ---------------- 事件处理 ---------------- */
     handleAction(act, el, ctx) {
       if (act === 'ck-filter') {
         viewFilter = el.dataset.filter;
@@ -117,7 +166,7 @@
         return true;
       }
 
-      /* 点账户行 → 一键切换今日打卡 */
+      /* 打卡切换：兼容 主页行 / 紧凑视图行 / 卡片视图行 */
       if (act === 'ck-toggle') {
         const { gameId, accId } = el.dataset;
         toggleCheck(gameId, accId);
@@ -127,13 +176,37 @@
         const a = g && g.accounts.find(x => x.id === accId);
         const checked = a && isChecked(a, date);
 
-        // 紧凑视图：整行淡出移除
+        /* 1. 主页卡片行：淡出移除 */
+        const homeRow = el.closest('.ck-home-row');
+        if (homeRow) {
+          homeRow.style.transition = 'opacity .2s ease, height .25s ease, padding .25s ease';
+          homeRow.style.opacity = '0';
+          homeRow.style.height = '0';
+          homeRow.style.paddingTop = '0';
+          homeRow.style.paddingBottom = '0';
+          setTimeout(() => {
+            homeRow.remove();
+            // 如果主页卡片剩下的未完成行都空了，给个"都完成"的提示
+            const list = homeRow.parentNode;
+            if (list && list.classList.contains('ck-home-list') && list.children.length === 0) {
+              const card = list.closest('.card');
+              if (card) {
+                const allDone = document.createElement('div');
+                allDone.className = 'ck-home-all-done';
+                allDone.textContent = '今天都签完啦 🎉';
+                list.replaceWith(allDone);
+              }
+            }
+          }, 280);
+          return true;
+        }
+
+        /* 2. 模块页紧凑视图：淡出移除 */
         const compactRow = el.closest('.ck-compact-row');
         if (compactRow) {
           compactRow.classList.add('checked');
           const check = compactRow.querySelector('.ck-compact-check');
           if (check) check.textContent = '✓';
-          // 等 300ms 让视觉反馈被看到，再把这行从 DOM 移除
           setTimeout(() => {
             compactRow.style.transition = 'opacity .22s ease, height .25s ease, margin .25s ease, padding .25s ease';
             compactRow.style.opacity = '0';
@@ -143,7 +216,6 @@
             compactRow.style.paddingBottom = '0';
             setTimeout(() => {
               compactRow.remove();
-              // 如果全部打完了，显示"都完成啦"
               const remain = document.querySelectorAll('.ck-compact-row').length;
               if (remain === 0) {
                 const list = document.querySelector('.ck-compact-list');
@@ -156,7 +228,7 @@
           return true;
         }
 
-        // 卡片视图：原来的行内更新
+        /* 3. 模块页卡片视图：行内状态更新 */
         const row = el.closest('.ck-acc-row');
         if (row) {
           row.classList.toggle('checked', checked);
@@ -180,7 +252,7 @@
     }
   });
 
-  /* ============ 页面 ============ */
+  /* ============ 页面渲染 ============ */
   function renderPage() {
     const data = getData();
 
@@ -192,8 +264,8 @@
 
     const filterBar = `
       <div class="tabs ck-tabs">
-        <button class="tab ${viewFilter === 'all' ? 'active' : ''}" data-act="ck-filter" data-filter="all">全部</button>
         <button class="tab ${viewFilter === 'todo' ? 'active' : ''}" data-act="ck-filter" data-filter="todo">今日未完成</button>
+        <button class="tab ${viewFilter === 'all' ? 'active' : ''}" data-act="ck-filter" data-filter="all">全部</button>
       </div>`;
 
     if (!data.games.length) {
@@ -207,7 +279,7 @@
       </div>`;
     }
 
-    // 紧凑视图：把所有"今天没签完"的账户拍平成一列
+    /* -------- 未完成：紧凑列表 -------- */
     if (viewFilter === 'todo') {
       const pending = [];
       data.games.forEach(g => {
@@ -242,13 +314,8 @@
       </div>`;
     }
 
-    // 全部视图：还是卡片
-    const cardsHtml = data.games.length
-      ? data.games.map(g => renderGameCard(g)).join('')
-      : `<div class="empty" data-emoji="🎮">
-          还没有添加游戏<br>
-          <button class="btn btn-primary" data-act="ck-add-game" style="margin-top:12px">+ 添加游戏</button>
-        </div>`;
+    /* -------- 全部：卡片视图 -------- */
+    const cardsHtml = data.games.map(g => renderGameCard(g)).join('');
 
     return `<div class="module checkin-module">
       ${head}
