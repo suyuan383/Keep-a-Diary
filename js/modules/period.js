@@ -21,6 +21,8 @@
   let calYM = null;
   let selectedDate = null;
   let historyLimit = 10;
+  let intimacyRange = 'month';
+  let intimacyAnchor = null;
 
   /* ============ 数据读写 ============ */
   function getData() {
@@ -34,21 +36,22 @@
   function ensureDay(date) {
     const d = getData().days;
     if (!d[date]) {
-      d[date] = { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
+      d[date] = { onPeriod: false, intimacy: false, flow: null, symptoms: [], mood: [], note: '' };
+    } else if (d[date].intimacy === undefined) {
+      d[date].intimacy = false;
     }
     return d[date];
   }
   function setDay(date, patch) {
-    // 静默保存，不触发全局重渲染，避免页面跳顶
     const updater = Store.updateSilent || Store.update;
     updater.call(Store, KEY, data => {
       if (!data.days) data.days = {};
       if (!data.days[date]) {
-        data.days[date] = { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
+        data.days[date] = { onPeriod: false, intimacy: false, flow: null, symptoms: [], mood: [], note: '' };
       }
       Object.assign(data.days[date], patch);
       const d = data.days[date];
-      const hasData = d.onPeriod || d.flow ||
+      const hasData = d.onPeriod || d.intimacy || d.flow ||
                       (d.symptoms && d.symptoms.length) ||
                       (d.mood && d.mood.length) || d.note;
       if (!hasData) delete data.days[date];
@@ -82,6 +85,13 @@
     const d = parseDate(s);
     return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
   }
+  function startOfWeek(d) {
+    const t = new Date(d);
+    const wd = t.getDay();
+    t.setDate(t.getDate() + (wd === 0 ? -6 : 1 - wd));
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }
 
   /* ============ 聚合：连续日期 → 一次经期 ============ */
   function aggregatePeriods() {
@@ -96,7 +106,6 @@
         const last = parseDate(cur.endDate);
         const thisD = parseDate(date);
         const diff = daysBetween(last, thisD);
-        // 连续或间隔 <= 2 天算同一次经期
         if (diff <= 2) {
           cur.endDate = date;
           cur.days.push(date);
@@ -174,9 +183,6 @@
     const isOnPeriod = today >= lastStart && today <= lastEnd;
     const periodDay = isOnPeriod ? daysBetween(lastStart, today) + 1 : null;
 
-    const todayKey = dateStr(today);
-    const todayData = getDay(todayKey);
-
     let confidence = 'low';
     if (recentCycles.length >= 3 && stdDev < 4) confidence = 'high';
     else if (recentCycles.length >= 2) confidence = 'mid';
@@ -189,9 +195,57 @@
       cycles, recentCycles,
       daysSinceLast, daysToNext,
       isOnPeriod, periodDay,
-      todayData,
       confidence
     };
+  }
+
+  /* ============ 亲密记录统计 ============ */
+  function computeIntimacyStats() {
+    const days = getData().days;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = dateStr(today);
+    const y = today.getFullYear();
+    const m = today.getMonth();
+
+    // 本周（周一到今天）
+    const monday = startOfWeek(today);
+    let weekCount = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(monday, i);
+      if (dateStr(d) > todayStr) break;
+      const ds = dateStr(d);
+      if (days[ds] && days[ds].intimacy) weekCount++;
+    }
+
+    // 本月（1 号到今天）
+    let monthCount = 0;
+    for (let d = 1; d <= today.getDate(); d++) {
+      const ds = U.todayStr(new Date(y, m, d));
+      if (days[ds] && days[ds].intimacy) monthCount++;
+    }
+
+    // 本年
+    let yearCount = 0;
+    const yearPrefix = y + '-';
+    Object.keys(days).forEach(ds => {
+      if (ds.indexOf(yearPrefix) === 0 && days[ds].intimacy) yearCount++;
+    });
+
+    // 最近 7 天
+    let last7 = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(today, -i);
+      const ds = dateStr(d);
+      if (days[ds] && days[ds].intimacy) last7++;
+    }
+
+    // 本年已经过的周数
+    const yearStart = new Date(y, 0, 1);
+    const daysPassed = Math.floor((today - yearStart) / 86400000) + 1;
+    const yearWeeks = Math.max(1, Math.ceil(daysPassed / 7));
+
+    return { weekCount, monthCount, yearCount, last7, yearWeeks };
   }
 
   /* ============ 注册模块 ============ */
@@ -279,10 +333,9 @@
         return true;
       }
 
-      /* --- 点日期：切换选中，局部更新 --- */
+      /* --- 点日期 --- */
       if (act === 'period-day-click') {
-        const date = el.dataset.date;
-        handleDayClick(date);
+        handleDayClick(el.dataset.date);
         return true;
       }
 
@@ -293,21 +346,39 @@
         day.onPeriod = !day.onPeriod;
         setDay(date, { onPeriod: day.onPeriod });
 
-        // 更新格子视觉
         const cell = document.querySelector(`.period-cell[data-date="${date}"]`);
         if (cell) {
           cell.classList.toggle('actual', day.onPeriod);
           if (day.onPeriod) cell.classList.remove('has-note');
         }
-
-        // 更新开关视觉
         const toggle = el.closest('.period-toggle');
         if (toggle) toggle.classList.toggle('active', day.onPeriod);
 
-        // 只切换流量区的显示，不重渲染（避免丢焦点）
         const flowSection = document.querySelector('.flow-section');
         if (flowSection) {
           flowSection.style.display = day.onPeriod ? '' : 'none';
+        }
+        return true;
+      }
+
+      /* --- 开关"亲密" --- */
+      if (act === 'period-toggle-intimacy') {
+        const date = el.dataset.date;
+        const day = ensureDay(date);
+        day.intimacy = !day.intimacy;
+        setDay(date, { intimacy: day.intimacy });
+
+        const toggle = el.closest('.period-toggle');
+        if (toggle) toggle.classList.toggle('active', day.intimacy);
+
+        // 更新日历格子小圆点（不影响 actual）
+        const cell = document.querySelector(`.period-cell[data-date="${date}"]`);
+        if (cell && !cell.classList.contains('actual')) {
+          const d = getDay(date) || {};
+          const hasNote = d.onPeriod || d.intimacy || d.flow ||
+                          (d.symptoms && d.symptoms.length) ||
+                          (d.mood && d.mood.length) || d.note;
+          cell.classList.toggle('has-note', hasNote);
         }
         return true;
       }
@@ -319,8 +390,6 @@
         const cur = getDay(date) || {};
         const next = cur.flow === id ? null : id;
         setDay(date, { flow: next });
-
-        // 局部更新按钮状态
         document.querySelectorAll(`.flow-btn[data-date="${date}"]`).forEach(btn => {
           btn.classList.toggle('active', btn.dataset.id === next);
         });
@@ -352,11 +421,33 @@
         return true;
       }
 
-      /* --- 备注：失焦保存 --- */
+      /* --- 备注 --- */
       if (act === 'period-note-blur') {
         const date = el.dataset.date;
         setDay(date, { note: el.value || '' });
         markCellHasNote(date);
+        return true;
+      }
+
+      /* --- 亲密 Tab：范围切换 --- */
+      if (act === 'intimacy-range') {
+        intimacyRange = el.dataset.range;
+        ctx.refresh();
+        return true;
+      }
+      if (act === 'intimacy-prev' || act === 'intimacy-next') {
+        const a = getIntimacyAnchor();
+        const dir = act === 'intimacy-prev' ? -1 : 1;
+        if (intimacyRange === 'week') a.setDate(a.getDate() + 7 * dir);
+        else if (intimacyRange === 'month') a.setMonth(a.getMonth() + dir);
+        else a.setFullYear(a.getFullYear() + dir);
+        intimacyAnchor = a;
+        ctx.refresh();
+        return true;
+      }
+      if (act === 'intimacy-now') {
+        intimacyAnchor = new Date();
+        ctx.refresh();
         return true;
       }
 
@@ -395,6 +486,7 @@
       <div class="tabs">
         <button class="tab ${viewTab === 'overview' ? 'active' : ''}" data-act="period-tab" data-tab="overview">概览</button>
         <button class="tab ${viewTab === 'calendar' ? 'active' : ''}" data-act="period-tab" data-tab="calendar">日历</button>
+        <button class="tab ${viewTab === 'intimacy' ? 'active' : ''}" data-act="period-tab" data-tab="intimacy">亲密</button>
         <button class="tab ${viewTab === 'trend' ? 'active' : ''}" data-act="period-tab" data-tab="trend">趋势</button>
         <button class="tab ${viewTab === 'history' ? 'active' : ''}" data-act="period-tab" data-tab="history">历史</button>
       </div>`;
@@ -402,6 +494,7 @@
     let body = '';
     if (viewTab === 'overview') body = renderOverview(p);
     else if (viewTab === 'calendar') body = renderCalendar(p);
+    else if (viewTab === 'intimacy') body = renderIntimacy();
     else if (viewTab === 'trend') body = renderTrend(p);
     else body = renderHistory();
 
@@ -414,11 +507,28 @@
 
   /* ============ 概览 ============ */
   function renderOverview(p) {
+    const stats = computeIntimacyStats();
+
+    const intimacyBlock = `
+      <div class="intimacy-overview">
+        <div class="intimacy-ov-title">❤️ 亲密记录</div>
+        <div class="intimacy-ov-row">
+          <span class="intimacy-ov-item"><b>${stats.weekCount}</b><i>本周</i></span>
+          <span class="intimacy-ov-item"><b>${stats.monthCount}</b><i>本月</i></span>
+          <span class="intimacy-ov-item"><b>${stats.yearCount}</b><i>本年</i></span>
+        </div>
+        <div class="intimacy-ov-freq">
+          平均每周 ${(stats.yearCount / stats.yearWeeks).toFixed(1)} 次
+        </div>
+        ${stats.last7 >= 2 ? `<div class="intimacy-ov-warn">⚠️ 最近 7 天已有 ${stats.last7} 次，注意身体哦</div>` : ''}
+      </div>`;
+
     if (!p) {
       return `<div class="empty" data-emoji="🩸">
         还没有记录<br>
         <button class="btn btn-primary" data-act="period-tab" data-tab="calendar" style="margin-top:12px">去日历记录</button>
-      </div>`;
+      </div>
+      ${intimacyBlock}`;
     }
 
     const cycleText = p.avgCycle ? Math.round(p.avgCycle) + ' 天' : '—';
@@ -457,12 +567,14 @@
         </div>
       </div>
 
+      ${intimacyBlock}
+
       <div class="period-tips">
         <div class="period-tips-title">预测说明</div>
         <div class="period-tips-item">· 基于最近 6 次周期加权平均</div>
         <div class="period-tips-item">· 越近的记录对预测影响越大</div>
         ${p.recentCycles.length < 3
-          ? `<div class="period-tips-item warn">· 数据不足 3 次，继续记录会更准</div>` : ''}
+          ? `<div class="period-tips-item warn">· 数据不足 3 次，继续记录会更准确</div>` : ''}
       </div>`;
   }
 
@@ -497,7 +609,6 @@
     }
 
     let cells = '';
-    // 注意：空格子用 is-blank 而不是 empty，避免与全局 .empty 样式冲突
     for (let i = 0; i < offset; i++) cells += `<div class="period-cell is-blank"></div>`;
     for (let d = 1; d <= dim; d++) {
       const ds = U.todayStr(new Date(year, month, d));
@@ -506,6 +617,7 @@
       if (actualDays[ds]) cls += ' actual';
       else if (predDays[ds]) cls += ' predicted';
       else if (dayData && (
+        dayData.onPeriod || dayData.intimacy ||
         (dayData.symptoms && dayData.symptoms.length) ||
         (dayData.mood && dayData.mood.length) ||
         dayData.flow || dayData.note
@@ -546,8 +658,9 @@
 
   /* ============ 详情面板 ============ */
   function renderDetailPanel(date) {
-    const day = getDay(date) || { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
+    const day = getDay(date) || { onPeriod: false, intimacy: false, flow: null, symptoms: [], mood: [], note: '' };
     const onPeriod = !!day.onPeriod;
+    const intimacy = !!day.intimacy;
 
     return `
       <div class="period-detail-head">
@@ -561,16 +674,21 @@
         <span class="period-toggle-switch"></span>
       </div>
 
+      <div class="period-toggle heart ${intimacy ? 'active' : ''}"
+        data-act="period-toggle-intimacy" data-date="${date}">
+        <span class="period-toggle-label">❤️ 亲密</span>
+        <span class="period-toggle-switch heart"></span>
+      </div>
+
       <div id="period-detail-body">
         ${renderDetailBody(date)}
       </div>`;
   }
 
   function renderDetailBody(date) {
-    const day = getDay(date) || { onPeriod: false, flow: null, symptoms: [], mood: [], note: '' };
+    const day = getDay(date) || { onPeriod: false, intimacy: false, flow: null, symptoms: [], mood: [], note: '' };
     const onPeriod = !!day.onPeriod;
 
-    // 流量区永远渲染，用 display 控制显示，避免切换时 DOM 重建丢焦点
     const flowRow = `
       <div class="period-detail-section flow-section" style="${onPeriod ? '' : 'display:none'}">
         <div class="period-detail-label">流量</div>
@@ -618,11 +736,173 @@
     return flowRow + symRow + moodRow + noteRow;
   }
 
+  /* ============ 亲密记录视图 ============ */
+  function getIntimacyAnchor() {
+    if (!intimacyAnchor) intimacyAnchor = new Date();
+    return intimacyAnchor;
+  }
+
+  function fmtIntimacyLabel(anchor) {
+    if (intimacyRange === 'week') {
+      const monday = startOfWeek(anchor);
+      const sunday = addDays(monday, 6);
+      const f = d => (d.getMonth() + 1) + '/' + d.getDate();
+      return f(monday) + ' - ' + f(sunday);
+    }
+    if (intimacyRange === 'month') {
+      return anchor.getFullYear() + '年' + (anchor.getMonth() + 1) + '月';
+    }
+    return anchor.getFullYear() + '年';
+  }
+
+  function renderIntimacy() {
+    const days = getData().days;
+    const anchor = getIntimacyAnchor();
+    const stats = computeIntimacyStats();
+
+    const rangeSwitch = `
+      <div class="tabs">
+        <button class="tab ${intimacyRange === 'week' ? 'active' : ''}" data-act="intimacy-range" data-range="week">周</button>
+        <button class="tab ${intimacyRange === 'month' ? 'active' : ''}" data-act="intimacy-range" data-range="month">月</button>
+        <button class="tab ${intimacyRange === 'year' ? 'active' : ''}" data-act="intimacy-range" data-range="year">年</button>
+      </div>`;
+
+    const head = `
+      <div class="period-cal-head">
+        <button class="sum-nav" data-act="intimacy-prev">‹</button>
+        <span class="period-cal-title">${fmtIntimacyLabel(anchor)}</span>
+        <div class="period-cal-right">
+          <button class="sum-now" data-act="intimacy-now">现在</button>
+          <button class="sum-nav" data-act="intimacy-next">›</button>
+        </div>
+      </div>`;
+
+    const warn = stats.last7 >= 2
+      ? `<div class="intimacy-warn">⚠️ 最近 7 天已有 ${stats.last7} 次记录，注意身体哦</div>`
+      : '';
+
+    const statsCard = `
+      <div class="intimacy-stats">
+        <div class="intimacy-stat">
+          <span class="intimacy-stat-label">本周</span>
+          <span class="intimacy-stat-value">${stats.weekCount}<i>次</i></span>
+        </div>
+        <div class="intimacy-stat">
+          <span class="intimacy-stat-label">本月</span>
+          <span class="intimacy-stat-value">${stats.monthCount}<i>次</i></span>
+        </div>
+        <div class="intimacy-stat">
+          <span class="intimacy-stat-label">本年</span>
+          <span class="intimacy-stat-value">${stats.yearCount}<i>次</i></span>
+        </div>
+      </div>`;
+
+    const freqCard = `
+      <div class="intimacy-freq">
+        📊 平均每周 ${(stats.yearCount / stats.yearWeeks).toFixed(1)} 次
+        <span class="intimacy-freq-hint">（基于本年 ${stats.yearWeeks} 周）</span>
+      </div>`;
+
+    let body = '';
+    if (intimacyRange === 'week') body = renderIntimacyWeek(anchor, days);
+    else if (intimacyRange === 'month') body = renderIntimacyMonth(anchor, days);
+    else body = renderIntimacyYear(anchor, days);
+
+    return `${rangeSwitch}${head}${warn}${statsCard}${freqCard}
+      <div class="intimacy-view-hint">点击日期可以直接切换亲密记录</div>
+      ${body}`;
+  }
+
+  function renderIntimacyWeek(anchor, days) {
+    const monday = startOfWeek(anchor);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = dateStr(today);
+    const WEEK = ['一','二','三','四','五','六','日'];
+
+    let cells = '';
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(monday, i);
+      const ds = dateStr(d);
+      const on = !!(days[ds] && days[ds].intimacy);
+      const isToday = ds === todayStr;
+      const isFuture = ds > todayStr;
+      let cls = 'intimacy-cell';
+      if (on) cls += ' on';
+      if (isToday) cls += ' today';
+      if (isFuture) cls += ' future';
+      cells += `<div class="${cls}" data-act="intimacy-cell-toggle" data-date="${ds}">
+        <div class="intimacy-cell-wd">周${WEEK[i]}</div>
+        <div class="intimacy-cell-day">${d.getDate()}</div>
+        <div class="intimacy-cell-heart">${on ? '❤️' : ''}</div>
+      </div>`;
+    }
+
+    return `<div class="intimacy-week-grid">${cells}</div>`;
+  }
+
+  function renderIntimacyMonth(anchor, days) {
+    const year = anchor.getFullYear();
+    const month = anchor.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const dim = new Date(year, month + 1, 0).getDate();
+    const offset = (firstDay.getDay() + 6) % 7;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = dateStr(today);
+
+    let cells = '';
+    for (let i = 0; i < offset; i++) cells += `<div class="intimacy-cell is-blank"></div>`;
+    for (let d = 1; d <= dim; d++) {
+      const ds = U.todayStr(new Date(year, month, d));
+      const on = !!(days[ds] && days[ds].intimacy);
+      const isToday = ds === todayStr;
+      const isFuture = ds > todayStr;
+      let cls = 'intimacy-cell';
+      if (on) cls += ' on';
+      if (isToday) cls += ' today';
+      if (isFuture) cls += ' future';
+      cells += `<div class="${cls}" data-act="intimacy-cell-toggle" data-date="${ds}">
+        <div class="intimacy-cell-day">${d}</div>
+        <div class="intimacy-cell-heart">${on ? '❤️' : ''}</div>
+      </div>`;
+    }
+
+    return `<div class="intimacy-month-grid">
+      <div class="intimacy-month-head">${['一','二','三','四','五','六','日'].map(w => `<span>${w}</span>`).join('')}</div>
+      <div class="intimacy-month-body">${cells}</div>
+    </div>`;
+  }
+
+  function renderIntimacyYear(anchor, days) {
+    const year = anchor.getFullYear();
+    const now = new Date();
+
+    let cells = '';
+    for (let m = 0; m < 12; m++) {
+      const dim = new Date(year, m + 1, 0).getDate();
+      let count = 0;
+      for (let d = 1; d <= dim; d++) {
+        const ds = U.todayStr(new Date(year, m, d));
+        if (days[ds] && days[ds].intimacy) count++;
+      }
+      const isCurrent = (year === now.getFullYear() && m === now.getMonth());
+      let cls = 'intimacy-year-cell';
+      if (count > 0) cls += ' on';
+      if (isCurrent) cls += ' current';
+      cells += `<div class="${cls}">
+        <div class="intimacy-year-m">${m + 1}月</div>
+        <div class="intimacy-year-count">${count > 0 ? count + ' 次' : '—'}</div>
+      </div>`;
+    }
+
+    return `<div class="intimacy-year-grid">${cells}</div>`;
+  }
+
   /* ============ 局部更新 ============ */
   function handleDayClick(date) {
     selectedDate = (selectedDate === date) ? null : date;
 
-    // 更新所有格子的选中状态
     document.querySelectorAll('.period-cell').forEach(el => {
       el.classList.toggle('selected', el.dataset.date === selectedDate);
     });
@@ -643,7 +923,7 @@
     if (!cell) return;
     if (cell.classList.contains('actual')) return;
     const day = getDay(date) || {};
-    const hasNote = day.onPeriod || day.flow ||
+    const hasNote = day.onPeriod || day.intimacy || day.flow ||
                     (day.symptoms && day.symptoms.length) ||
                     (day.mood && day.mood.length) || day.note;
     cell.classList.toggle('has-note', hasNote);

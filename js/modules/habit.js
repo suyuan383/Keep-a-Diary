@@ -1,7 +1,7 @@
 (function () {
   const KEY = 'habit';
 
-  let listTab = 'today';       // 列表页 tab：today | manage
+  let listTab = 'today';       // 列表页 tab：today | manage | reward
   let detailTab = 'week';      // 详情页 tab：week | month | year
   let summaryOpen = false;     // 月汇总是否展开
   let summaryYM = null;        // { year, month } 汇总显示的月份
@@ -23,6 +23,11 @@
     if (it.yearlyTarget === undefined) it.yearlyTarget = null;
     if (!it.unit) it.unit = it.type === 'duration' ? '分钟' : '次';
     if (!it.records) it.records = {};
+    // 补全分组：老习惯自动归到第一个分组
+    if (!it.groupId && window.Reward) {
+      const gs = Reward.getGroups();
+      if (gs.length) it.groupId = gs[0].id;
+    }
     return it;
   }
 
@@ -36,6 +41,18 @@
     item.records = item.records || {};
     if (v <= 0) delete item.records[ds];
     else item.records[ds] = v;
+  }
+
+  /* =========================================================
+     结算辅助
+     ========================================================= */
+  function trySettle(habit, date) {
+    if (!window.Reward || !habit) return;
+    try {
+      Reward.settleCheck(habit, date);
+    } catch (e) {
+      console.warn('[habit] settleCheck error', e);
+    }
   }
 
   /* =========================================================
@@ -100,6 +117,9 @@
       const today = U.todayStr();
       const items = activeItems();
 
+      // 奖励账户余额块（无论有没有打卡项都显示）
+      const rewardBlock = renderRewardHomeBlock();
+
       if (!items.length) {
         return `<div class="card">
           <div class="card-head">
@@ -108,6 +128,7 @@
             <a class="card-more" href="#habit">去设置 ›</a>
           </div>
           <div class="card-empty">还没有打卡项，点击右上角添加</div>
+          ${rewardBlock}
         </div>`;
       }
 
@@ -138,11 +159,17 @@
           <a class="card-more" href="#habit">详情 ›</a>
         </div>
         <div class="habit-list">${rows}</div>
+        ${rewardBlock}
       </div>`;
     },
 
     /* ---------------- 模块页面 ---------------- */
     page(ctx) {
+      // #habit/reward → 直接进奖励账户 tab
+      if (ctx && ctx.arg === 'reward') {
+        listTab = 'reward';
+        return renderList();
+      }
       if (ctx && ctx.arg) return renderDetail(ctx.arg);
       return renderList();
     },
@@ -150,6 +177,12 @@
     /* ---------------- 事件分发 ---------------- */
     handleAction(act, el, ctx) {
       const today = U.todayStr();
+
+      /* ---- 奖励账户相关（前缀 reward-，转给 Reward） ---- */
+      if (act && act.indexOf('reward-') === 0) {
+        if (window.Reward && Reward.handleAction(act, el, ctx)) return true;
+        return false;
+      }
 
       /* ---- 列表 Tab 切换 ---- */
       if (act === 'habit-tab') {
@@ -199,7 +232,11 @@
         const id = el.dataset.id;
         Store.update(KEY, data => {
           const it = data.items.find(x => x.id === id);
-          if (it) setCount(it, today, getCount(it, today) + 1);
+          if (it) {
+            setCount(it, today, getCount(it, today) + 1);
+            // 打卡后立即结算
+            trySettle(it, today);
+          }
           return data;
         });
         return true;
@@ -227,7 +264,10 @@
           if (!mins) return;
           Store.update(KEY, data => {
             const t = data.items.find(x => x.id === id);
-            if (t) setCount(t, today, getCount(t, today) + mins);
+            if (t) {
+              setCount(t, today, getCount(t, today) + mins);
+              trySettle(t, today);
+            }
             return data;
           });
         });
@@ -254,7 +294,27 @@
 
       /* ---- 新增 ---- */
       if (act === 'habit-add') {
-        UI.form('新增打卡项', [
+        const groups = (window.Reward) ? Reward.getGroups() : [];
+        if (window.Reward && !groups.length) {
+          UI.confirm('还没有奖励账户分组，请先到"奖励账户"创建一个分组。\n现在去看？').then(ok => {
+            if (!ok) return;
+            listTab = 'reward';
+            if (ctx && ctx.refresh) ctx.refresh();
+          });
+          return true;
+        }
+
+        const fields = [];
+        if (groups.length) {
+          fields.push({
+            name: 'group',
+            label: '所属分组',
+            type: 'select',
+            value: groups[0].id,
+            options: groups.map(g => ({ value: g.id, label: g.name }))
+          });
+        }
+        fields.push(
           { name: 'name',  label: '名称', required: true, placeholder: '例如：运动' },
           { name: 'icon',  label: '图标（emoji）', placeholder: '🏃' },
           { name: 'type',  label: '类型', type: 'select', value: 'count', options: [
@@ -266,13 +326,16 @@
           { name: 'weeklyTarget',  label: '周目标（可留空）', type: 'number', value: '' },
           { name: 'monthlyTarget', label: '月目标（可留空）', type: 'number', value: '' },
           { name: 'yearlyTarget',  label: '年目标（可留空）', type: 'number', value: '' }
-        ]).then(r => {
+        );
+
+        UI.form('新增打卡项', fields).then(r => {
           if (!r) return;
           const item = {
             id: U.uid('h'),
             name: r.name,
             icon: r.icon || (r.type === 'duration' ? '🏃' : '✅'),
             type: r.type || 'count',
+            groupId: r.group || (groups[0] ? groups[0].id : null),
             dailyTarget: Math.max(1, Number(r.dailyTarget) || 1),
             unit: r.unit || (r.type === 'duration' ? '分钟' : '次'),
             weeklyTarget: r.weeklyTarget === '' || r.weeklyTarget == null ? null : Math.max(1, Number(r.weeklyTarget)),
@@ -295,7 +358,19 @@
         const id = el.dataset.id;
         const it = getData().items.find(x => x.id === id);
         if (!it) return true;
-        UI.form('编辑打卡项', [
+
+        const groups = (window.Reward) ? Reward.getGroups() : [];
+        const fields = [];
+        if (groups.length) {
+          fields.push({
+            name: 'group',
+            label: '所属分组',
+            type: 'select',
+            value: it.groupId || groups[0].id,
+            options: groups.map(g => ({ value: g.id, label: g.name }))
+          });
+        }
+        fields.push(
           { name: 'name',  label: '名称', required: true, value: it.name },
           { name: 'icon',  label: '图标（emoji）', value: it.icon },
           { name: 'dailyTarget',   label: '每日目标（' + unitOf(it) + '）', type: 'number', value: it.dailyTarget, required: true },
@@ -303,13 +378,16 @@
           { name: 'weeklyTarget',  label: '周目标（可留空）', type: 'number', value: it.weeklyTarget == null ? '' : it.weeklyTarget },
           { name: 'monthlyTarget', label: '月目标（可留空）', type: 'number', value: it.monthlyTarget == null ? '' : it.monthlyTarget },
           { name: 'yearlyTarget',  label: '年目标（可留空）', type: 'number', value: it.yearlyTarget == null ? '' : it.yearlyTarget }
-        ]).then(r => {
+        );
+
+        UI.form('编辑打卡项', fields).then(r => {
           if (!r) return;
           Store.update(KEY, data => {
             const t = data.items.find(x => x.id === id);
             if (!t) return data;
             t.name = r.name;
             t.icon = r.icon;
+            if (r.group) t.groupId = r.group;
             t.dailyTarget = Math.max(1, Number(r.dailyTarget) || 1);
             t.unit = r.unit || (t.type === 'duration' ? '分钟' : '次');
             t.weeklyTarget  = r.weeklyTarget  === '' || r.weeklyTarget  == null ? null : Math.max(1, Number(r.weeklyTarget));
@@ -351,6 +429,39 @@
   });
 
   /* =========================================================
+     主页卡片：奖励账户余额块
+     ========================================================= */
+  function renderRewardHomeBlock() {
+    if (!window.Reward) return '';
+    let groups = [];
+    try { groups = Reward.getGroups(); } catch (e) { return ''; }
+    if (!groups.length) return '';
+
+    const rows = groups.map(g => {
+      const bal = g.balance || 0;
+      const isNeg = bal < 0;
+      const absYuan = Math.abs(bal) / 100;
+      const numStr = Number.isInteger(absYuan)
+        ? String(absYuan)
+        : absYuan.toFixed(2).replace(/\.?0+$/, '');
+      const text = isNeg ? `欠账 ¥ ${numStr}` : `¥ ${numStr}`;
+      return `<div class="habit-reward-row">
+        <span class="habit-reward-icon">${U.escape(g.icon || '💰')}</span>
+        <span class="habit-reward-name">${U.escape(g.name)}</span>
+        <span class="habit-reward-balance ${isNeg ? 'negative' : ''}">${text}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="habit-reward-block">
+      <div class="habit-reward-title">
+        <span>💰 奖励账户</span>
+        <a class="habit-reward-link" href="#habit/reward">详情 ›</a>
+      </div>
+      ${rows}
+    </div>`;
+  }
+
+  /* =========================================================
      列表页
      ========================================================= */
   function renderList() {
@@ -358,8 +469,32 @@
       <div class="tabs">
         <button class="tab ${listTab === 'today' ? 'active' : ''}" data-act="habit-tab" data-tab="today">今日打卡</button>
         <button class="tab ${listTab === 'manage' ? 'active' : ''}" data-act="habit-tab" data-tab="manage">事项管理</button>
+        <button class="tab ${listTab === 'reward' ? 'active' : ''}" data-act="habit-tab" data-tab="reward">奖励账户</button>
       </div>`;
 
+    /* ---- 奖励账户 tab ---- */
+    if (listTab === 'reward') {
+      if (!window.Reward) {
+        return `<div class="module habit-module">
+          ${tabs}
+          <div class="empty" data-emoji="💰">奖励账户模块未加载<br>
+            请检查是否引入了 js/modules/reward.js</div>
+        </div>`;
+      }
+      let rewardHtml = '';
+      try {
+        rewardHtml = Reward.render();
+      } catch (e) {
+        console.error('[habit] Reward.render 出错', e);
+        rewardHtml = `<div class="empty">奖励账户加载失败<br>${U.escape(String(e.message || e))}</div>`;
+      }
+      return `<div class="module habit-module">
+        ${tabs}
+        ${rewardHtml}
+      </div>`;
+    }
+
+    /* ---- 今日打卡 / 事项管理 ---- */
     const summaryBtn = `
       <button class="summary-toggle-btn ${summaryOpen ? 'active' : ''}"
         data-act="habit-toggle-summary">
@@ -548,6 +683,9 @@
      ========================================================= */
   function renderManage() {
     const all = getData().items;
+    const groups = (window.Reward) ? Reward.getGroups() : [];
+    const groupMap = {};
+    groups.forEach(g => { groupMap[g.id] = g; });
 
     if (!all.length) {
       return `<div class="empty">暂无事项，点击下方按钮新增<br>
@@ -562,12 +700,16 @@
       if (it.monthlyTarget) chips.push(`月 ${it.monthlyTarget}${unitOf(it)}`);
       if (it.yearlyTarget)  chips.push(`年 ${it.yearlyTarget}${unitOf(it)}`);
       const typeTag = it.type === 'duration' ? '<span class="tag tag-dur">时长</span>' : '';
+      const g = it.groupId && groupMap[it.groupId];
+      const groupTag = g
+        ? `<span class="tag tag-group" title="所属分组">${U.escape(g.icon || '💰')} ${U.escape(g.name)}</span>`
+        : '';
 
       return `<div class="manage-item ${it.archived ? 'archived' : ''}">
         <span class="habit-icon">${U.escape(it.icon || '•')}</span>
         <div class="manage-info">
           <div class="manage-name">${U.escape(it.name)}${typeTag}${it.archived ? '<span class="tag">已归档</span>' : ''}</div>
-          <div class="manage-sub">${chips.join(' · ')}</div>
+          <div class="manage-sub">${groupTag}${chips.join(' · ')}</div>
         </div>
         <div class="manage-actions">
           <button class="btn btn-ghost" data-act="habit-edit" data-id="${it.id}">编辑</button>
@@ -606,6 +748,13 @@
     if (item.monthlyTarget) chips.push(`每月 ≥ ${item.monthlyTarget}${unit}`);
     if (item.yearlyTarget)  chips.push(`每年 ≥ ${item.yearlyTarget}${unit}`);
 
+    // 分组标签
+    const groups = (window.Reward) ? Reward.getGroups() : [];
+    const g = groups.find(x => x.id === item.groupId);
+    const groupChip = g
+      ? `<span class="meta-chip">${U.escape(g.icon || '💰')} ${U.escape(g.name)}</span>`
+      : '';
+
     const tabs = `
       <div class="tabs">
         <button class="tab ${detailTab === 'week' ? 'active' : ''}" data-act="habit-detail-tab" data-tab="week">周视图</button>
@@ -632,6 +781,7 @@
       </div>
       <div class="detail-meta">
         <span class="meta-type">${item.type === 'duration' ? '⏱ 时长打卡' : '🔢 次数打卡'}</span>
+        ${groupChip}
         ${chips.map(c => `<span class="meta-chip">${U.escape(c)}</span>`).join('')}
         ${item.archived ? '<span class="tag">已归档</span>' : ''}
       </div>

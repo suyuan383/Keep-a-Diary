@@ -443,3 +443,279 @@
   border-color: var(--primary);
   background: #fff;
 }
+/* =====================================================
+   亲密记录
+   ===================================================== */
+
+/* 详情面板里的 ❤️ 开关 */
+.period-toggle.heart.active {
+  background: #fde7f3;
+}
+.period-toggle.heart.active .period-toggle-label {
+  color: #c9317a;
+}
+.period-toggle.heart.active .period-toggle-switch.heart {
+  background: #f472b6;
+}
+
+/* 概览里的亲密统计块 */
+.intimacy-overview {
+  background: linear-gradient(135deg, #fff5f9, #fdeaf3);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.intimacy-ov-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9317a;
+  margin-bottom: 10px;
+}
+.intimacy-ov-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.intimacy-ov-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.intimacy-ov-item b {
+  font-size: 20px;
+  font-weight: 700;
+  color: #b3397a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.intimacy-ov-item i {
+  font-size: 11px;
+  color: #c96a88;
+  font-style: normal;
+}
+.intimacy-ov-freq {
+  font-size: 12px;
+  color: #b3397a;
+  text-align: center;
+  padding-top: 6px;
+  border-top: 1px dashed #f8b6c9;
+}
+.intimacy-ov-warn {
+  font-size: 12px;
+  color: #b8760a;
+  background: #fef4e0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* 亲密 Tab 提示条 */
+.intimacy-warn {
+  background: #fef4e0;
+  color: #b8760a;
+  font-size: 12.5px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* 亲密统计卡片 */
+.intimacy-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.intimacy-stat {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.intimacy-stat-label {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.intimacy-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #b3397a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.intimacy-stat-value i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+
+/* 频率行 */
+.intimacy-freq {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #b3397a;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.intimacy-freq-hint {
+  color: var(--text-3);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* 提示文字 */
+.intimacy-view-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-bottom: 10px;
+}
+
+/* ============ 周视图 ============ */
+.intimacy-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.intimacy-cell {
+  background: #f7f8fa;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 2px;
+  min-height: 72px;
+  cursor: pointer;
+  transition: all .15s ease;
+  border: 2px solid transparent;
+}
+.intimacy-cell:active { transform: scale(.95); }
+.intimacy-cell.is-blank {
+  background: transparent;
+  cursor: default;
+}
+.intimacy-cell.future {
+  opacity: .45;
+}
+.intimacy-cell.today {
+  border-color: var(--primary);
+}
+.intimacy-cell.on {
+  background: linear-gradient(135deg, #ffe4f0, #fdd5e8);
+}
+.intimacy-cell.on .intimacy-cell-heart {
+  font-size: 16px;
+  line-height: 1;
+}
+.intimacy-cell-wd {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.intimacy-cell-day {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.intimacy-cell-heart {
+  height: 16px;
+  line-height: 16px;
+  font-size: 0;
+  transition: font-size .1s ease;
+}
+
+/* ============ 月视图 ============ */
+.intimacy-month-grid {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+.intimacy-month-head {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  padding-bottom: 8px;
+}
+.intimacy-month-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.intimacy-month-body .intimacy-cell {
+  min-height: 42px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f7f8fa;
+}
+.intimacy-month-body .intimacy-cell .intimacy-cell-day {
+  font-size: 13px;
+}
+.intimacy-month-body .intimacy-cell .intimacy-cell-heart {
+  height: 12px;
+  line-height: 12px;
+}
+.intimacy-month-body .intimacy-cell.on .intimacy-cell-heart {
+  font-size: 12px;
+}
+.intimacy-month-body .intimacy-cell.is-blank {
+  background: transparent;
+  cursor: default;
+}
+
+/* ============ 年视图 ============ */
+.intimacy-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.intimacy-year-cell {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  padding: 14px 8px;
+  text-align: center;
+  transition: all .15s ease;
+}
+.intimacy-year-cell.on {
+  background: linear-gradient(135deg, #fff0f7, #fde4f0);
+  box-shadow: 0 4px 12px rgba(244,114,182,.12);
+}
+.intimacy-year-cell.current {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.intimacy-year-m {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.intimacy-year-count {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.intimacy-year-cell.on .intimacy-year-m { color: #b3397a; }
+.intimacy-year-cell.on .intimacy-year-count {
+  color: #c9317a;
+  font-weight: 600;
+}
