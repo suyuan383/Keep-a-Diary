@@ -431,3 +431,67 @@
   margin-top: 4px;
   margin-bottom: 16px;
 }
+/* =====================================================
+   月视图 / 年视图 布局修复
+   ===================================================== */
+
+/* 卡片本身防止溢出 */
+.ev-month-card {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 星期行和日期主体共用同一套 grid 规则 */
+.ev-month-week,
+.ev-month-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* 关键：让 1fr 可以压缩到比内容更小，防止撑破 */
+.ev-month-week > *,
+.ev-month-body > * {
+  min-width: 0;
+}
+
+/* 固定高度替代 aspect-ratio，避免移动端渲染不一致 */
+.ev-month-cell {
+  aspect-ratio: auto;
+  height: 44px;
+  min-height: 0;
+  padding: 2px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+/* 日期数字 */
+.ev-month-cell .ev-month-day {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+/* 有记录时右上角的小数字徽章 */
+.ev-month-cell .ev-month-count {
+  font-size: 9px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(76,139,245,.85);
+  color: #fff;
+  min-width: 12px;
+  text-align: center;
+}
+
+/* 年视图同样加保护 */
+.ev-year-grid > * {
+  min-width: 0;
+}
