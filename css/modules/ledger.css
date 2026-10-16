@@ -226,7 +226,7 @@
 .acc-card-overlay {
   position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 100%);
-  padding: 14px 16px;
+  padding: 16px 18px 20px;    /* ← 只改这一行，原来 14px 16px */
   display: flex; flex-direction: column; justify-content: space-between;
   color: #fff;
 }
@@ -672,3 +672,562 @@
 .lb-foot .ok   { color: var(--text-2); }
 .lb-foot .warn { color: #b8760a; }
 .lb-foot .over { color: #b02a2a; font-weight: 600; }
+/* =====================================================
+   账户卡片：时间进度
+   ===================================================== */
+.acc-card-time {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+  margin-bottom: 8px;
+  opacity: .95;
+}
+.acc-card-time-label { font-weight: 500; }
+.acc-card-time-pct { font-weight: 600; }
+.acc-card-time-pct.behind { color: #ffe4a8; }
+.acc-card-time-pct.ahead  { color: #c8f5d6; }
+.acc-card-time-pct.ok     { color: #fff; }
+
+/* =====================================================
+   账户详情页
+   ===================================================== */
+.acc-detail-page { padding-bottom: 24px; }
+
+.acc-detail-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.acc-detail-back {
+  border: none; background: transparent;
+  color: var(--text-2); font-size: 14px;
+  cursor: pointer; padding: 4px 6px 4px 0;
+}
+.acc-detail-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 600;
+  flex: 1; min-width: 0;
+}
+.acc-detail-icon { font-size: 20px; }
+.acc-detail-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 余额卡 */
+.acc-detail-balance-card {
+  background: linear-gradient(135deg, #d9ecff, #bcdaff);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  margin-bottom: 12px;
+  text-align: center;
+  color: #1c62b8;
+  box-shadow: 0 4px 16px rgba(76,139,245,.12);
+}
+.acc-detail-balance-label {
+  font-size: 12px; opacity: .75; margin-bottom: 6px;
+}
+.acc-detail-balance {
+  font-size: 32px; font-weight: 800;
+  line-height: 1; font-variant-numeric: tabular-nums;
+  letter-spacing: .5px; margin-bottom: 8px;
+}
+.acc-detail-balance-bar {
+  height: 8px; background: rgba(28,98,184,.15);
+  border-radius: 999px; overflow: hidden;
+  margin-bottom: 6px;
+}
+.acc-detail-balance-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #4c8bf5, #6ea8fe);
+  border-radius: 999px; transition: width .3s ease;
+}
+.acc-detail-balance-meta { font-size: 12px; opacity: .8; }
+
+/* 时间进度卡 */
+.acc-time-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.acc-time-title {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.acc-time-title > span:first-child {
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.acc-time-status {
+  font-size: 12px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+}
+.acc-time-status.ok   { background: #e6f7ec; color: #157347; }
+.acc-time-status.warn { background: #fef4e0; color: #b8760a; }
+.acc-time-status.over { background: #fdecec; color: #b02a2a; }
+.acc-time-status.done { background: #e6f7ec; color: #157347; }
+
+.acc-time-range {
+  font-size: 13px; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.acc-time-meta {
+  font-size: 12px; color: var(--text-3);
+  margin-bottom: 12px;
+}
+
+/* 双标记进度条 */
+.acc-time-bar {
+  position: relative;
+  height: 10px;
+  background: #eef0f3;
+  border-radius: 999px;
+  overflow: visible;
+  margin-bottom: 6px;
+}
+.acc-time-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #c4b5e8, #a993e0);
+  border-radius: 999px; transition: width .3s ease;
+}
+.acc-time-bar-mark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 16px;
+  background: #4caf7d;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 2px #fff;
+}
+.acc-time-bar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-3);
+  margin-bottom: 12px;
+}
+
+/* 还需攒 */
+.acc-time-suggestion {
+  background: #f7f8fa;
+  border-radius: 10px;
+  padding: 12px;
+}
+.ats-title {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; margin-bottom: 8px;
+}
+.ats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ats-item {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+}
+.ats-num {
+  font-size: 15px; font-weight: 700;
+  color: #b3397a; font-variant-numeric: tabular-nums;
+}
+.ats-label {
+  font-size: 11px; color: var(--text-3);
+}
+
+/* 年份切换 */
+.acc-detail-year {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.acc-detail-year-title {
+  font-weight: 600; font-size: 15px;
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; text-align: center; justify-content: center;
+}
+.acc-detail-year .sum-nav:disabled {
+  opacity: .35; cursor: not-allowed;
+}
+
+/* 视图切换 */
+.acc-detail-tabs { margin-bottom: 14px; }
+
+/* 汇总 */
+.acc-detail-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 8px;
+  margin-bottom: 14px;
+}
+.ads-item {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+}
+.ads-label { font-size: 11px; color: var(--text-3); }
+.ads-value {
+  font-size: 14px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ads-value.income { color: #4caf7d; }
+.ads-value.outcome { color: #e35d5d; }
+
+/* 折线图 */
+.acc-detail-chart {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.acc-detail-legend {
+  display: flex; gap: 16px; justify-content: center;
+  margin-bottom: 8px; font-size: 12px; color: var(--text-2);
+}
+.adl-dot {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 50%; margin-right: 4px; vertical-align: -1px;
+}
+.adl-dot.in { background: #4caf7d; }
+.adl-dot.out { background: #e35d5d; }
+
+/* 月度卡片 */
+.acc-detail-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 500px) {
+  .acc-detail-cards { grid-template-columns: repeat(3, 1fr); }
+}
+.acc-month-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.acc-month-card.empty {
+  background: #fafbfc; opacity: .75;
+}
+.acc-month-title {
+  font-size: 14px; font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px; padding-bottom: 6px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.acc-month-row {
+  display: flex; justify-content: space-between;
+  align-items: baseline; font-size: 12px;
+}
+.acc-month-label { color: var(--text-3); }
+.acc-month-val {
+  font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.acc-month-val.income { color: #4caf7d; }
+.acc-month-val.outcome { color: #e35d5d; }
+.acc-month-net {
+  margin-top: 4px; padding-top: 6px;
+  border-top: 1px dashed var(--line-soft);
+  font-size: 13px; font-weight: 700;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.acc-month-net.income { color: #4caf7d; }
+.acc-month-net.outcome { color: #e35d5d; }
+.acc-month-empty {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; padding: 8px 0;
+}
+
+/* 底部菜单里的"详情"按钮 */
+.acc-sheet-detail {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+  background: #f0ebf8;
+  color: #6f42c1;
+}
+.acc-sheet-detail .acc-sheet-icon { font-size: 16px; }
+/* =====================================================
+   账户卡片：时间进度
+   ===================================================== */
+.acc-card-time {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+  margin-bottom: 8px;
+  opacity: .95;
+}
+.acc-card-time-label { font-weight: 500; }
+.acc-card-time-pct { font-weight: 600; }
+.acc-card-time-pct.behind { color: #ffe4a8; }
+.acc-card-time-pct.ahead  { color: #c8f5d6; }
+.acc-card-time-pct.ok     { color: #fff; }
+
+/* =====================================================
+   账户详情页
+   ===================================================== */
+.acc-detail-page { padding-bottom: 24px; }
+
+.acc-detail-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px;
+}
+.acc-detail-back {
+  border: none; background: transparent;
+  color: var(--text-2); font-size: 14px;
+  cursor: pointer; padding: 4px 6px 4px 0;
+}
+.acc-detail-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 600;
+  flex: 1; min-width: 0;
+}
+.acc-detail-icon { font-size: 20px; }
+.acc-detail-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.acc-detail-balance-card {
+  background: linear-gradient(135deg, #d9ecff, #bcdaff);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  margin-bottom: 12px;
+  text-align: center;
+  color: #1c62b8;
+  box-shadow: 0 4px 16px rgba(76,139,245,.12);
+}
+.acc-detail-balance-label {
+  font-size: 12px; opacity: .75; margin-bottom: 6px;
+}
+.acc-detail-balance {
+  font-size: 32px; font-weight: 800;
+  line-height: 1; font-variant-numeric: tabular-nums;
+  letter-spacing: .5px; margin-bottom: 8px;
+}
+.acc-detail-balance-bar {
+  height: 8px; background: rgba(28,98,184,.15);
+  border-radius: 999px; overflow: hidden;
+  margin-bottom: 6px;
+}
+.acc-detail-balance-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #4c8bf5, #6ea8fe);
+  border-radius: 999px; transition: width .3s ease;
+}
+.acc-detail-balance-meta { font-size: 12px; opacity: .8; }
+
+.acc-time-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.acc-time-title {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.acc-time-title > span:first-child {
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.acc-time-status {
+  font-size: 12px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+}
+.acc-time-status.ok   { background: #e6f7ec; color: #157347; }
+.acc-time-status.warn { background: #fef4e0; color: #b8760a; }
+.acc-time-status.over { background: #fdecec; color: #b02a2a; }
+.acc-time-status.done { background: #e6f7ec; color: #157347; }
+
+.acc-time-range {
+  font-size: 13px; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.acc-time-meta {
+  font-size: 12px; color: var(--text-3);
+  margin-bottom: 12px;
+}
+
+.acc-time-bar {
+  position: relative;
+  height: 10px;
+  background: #eef0f3;
+  border-radius: 999px;
+  overflow: visible;
+  margin-bottom: 6px;
+}
+.acc-time-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #c4b5e8, #a993e0);
+  border-radius: 999px; transition: width .3s ease;
+}
+.acc-time-bar-mark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 16px;
+  background: #4caf7d;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 2px #fff;
+}
+.acc-time-bar-labels {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-3);
+  margin-bottom: 12px;
+}
+
+.acc-time-suggestion {
+  background: #f7f8fa;
+  border-radius: 10px;
+  padding: 12px;
+}
+.ats-title {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; margin-bottom: 8px;
+}
+.ats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ats-item {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+}
+.ats-num {
+  font-size: 15px; font-weight: 700;
+  color: #b3397a; font-variant-numeric: tabular-nums;
+}
+.ats-label {
+  font-size: 11px; color: var(--text-3);
+}
+
+.acc-detail-year {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
+}
+.acc-detail-year-title {
+  font-weight: 600; font-size: 15px;
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; text-align: center; justify-content: center;
+}
+.acc-detail-year .sum-nav:disabled {
+  opacity: .35; cursor: not-allowed;
+}
+
+.acc-detail-tabs { margin-bottom: 14px; }
+
+.acc-detail-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 8px;
+  margin-bottom: 14px;
+}
+.ads-item {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+}
+.ads-label { font-size: 11px; color: var(--text-3); }
+.ads-value {
+  font-size: 14px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ads-value.income { color: #4caf7d; }
+.ads-value.outcome { color: #e35d5d; }
+
+.acc-detail-chart {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.acc-detail-legend {
+  display: flex; gap: 16px; justify-content: center;
+  margin-bottom: 8px; font-size: 12px; color: var(--text-2);
+}
+.adl-dot {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 50%; margin-right: 4px; vertical-align: -1px;
+}
+.adl-dot.in { background: #4caf7d; }
+.adl-dot.out { background: #e35d5d; }
+
+.acc-detail-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 500px) {
+  .acc-detail-cards { grid-template-columns: repeat(3, 1fr); }
+}
+.acc-month-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.acc-month-card.empty {
+  background: #fafbfc; opacity: .75;
+}
+.acc-month-title {
+  font-size: 14px; font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px; padding-bottom: 6px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.acc-month-row {
+  display: flex; justify-content: space-between;
+  align-items: baseline; font-size: 12px;
+}
+.acc-month-label { color: var(--text-3); }
+.acc-month-val {
+  font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.acc-month-val.income { color: #4caf7d; }
+.acc-month-val.outcome { color: #e35d5d; }
+.acc-month-net {
+  margin-top: 4px; padding-top: 6px;
+  border-top: 1px dashed var(--line-soft);
+  font-size: 13px; font-weight: 700;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.acc-month-net.income { color: #4caf7d; }
+.acc-month-net.outcome { color: #e35d5d; }
+.acc-month-empty {
+  font-size: 12px; color: var(--text-3);
+  text-align: center; padding: 8px 0;
+}
+
+.acc-sheet-detail {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+  background: #f0ebf8;
+  color: #6f42c1;
+}
+.acc-sheet-detail .acc-sheet-icon { font-size: 16px; }
+/* 卡片底部行再加一点下边距，防止贴边 */
+.acc-card-foot {
+  padding-bottom: 2px;
+}
+
+/* 或者整体加高卡片 */
+.acc-card-image {
+  min-height: 148px;   /* 从 140px 加高一点 */
+}

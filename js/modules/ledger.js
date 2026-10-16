@@ -30,11 +30,33 @@
     { id: 'card',   icon: '💳', name: '银行卡' }
   ];
 
+  /* ============ 账户背景色方案 ============ */
+  const ACC_THEMES = [
+    { id: 'auto',    name: '自动',   grad: null },
+    { id: 'peach',   name: '蜜桃',   grad: 'linear-gradient(135deg, #ffc3a0, #ffafbd)' },
+    { id: 'matcha',  name: '抹茶',   grad: 'linear-gradient(135deg, #a8e6cf, #dcedc1)' },
+    { id: 'ocean',   name: '海盐',   grad: 'linear-gradient(135deg, #a1c4fd, #c2e9fb)' },
+    { id: 'sunset',  name: '晚霞',   grad: 'linear-gradient(135deg, #f6d365, #fda085)' },
+    { id: 'coffee',  name: '奶咖',   grad: 'linear-gradient(135deg, #d4a574, #b08968)' },
+    { id: 'forest',  name: '云杉',   grad: 'linear-gradient(135deg, #96e6a1, #4caf7d)' },
+    { id: 'rose',    name: '蔷薇',   grad: 'linear-gradient(135deg, #fbc2eb, #f8a5c2)' },
+    { id: 'amber',   name: '琥珀',   grad: 'linear-gradient(135deg, #fdc830, #f37335)' },
+    { id: 'aurora',  name: '极光',   grad: 'linear-gradient(135deg, #84fab0, #8fd3f4)' },
+    { id: 'lilac',   name: '雾紫',   grad: 'linear-gradient(135deg, #c2b3e0, #a6a1e0)' },
+    { id: 'meadow',  name: '原野',   grad: 'linear-gradient(135deg, #d4fc79, #96e6a1)' },
+    { id: 'midnight',name: '深蓝',   grad: 'linear-gradient(135deg, #667eea, #764ba2)' }
+  ];
+
+  function getTheme(id) {
+    return ACC_THEMES.find(t => t.id === id) || null;
+  }
+
   /* ============ 模块状态 ============ */
   let viewTab = 'list';       // list | stats | trend | accounts
   let viewRange = 'month';    // week | month | year
-  let anchorDate = null;      // 当前视图锚定的日期（Date 对象）
+  let anchorDate = null;
   let sheetState = null;
+  let accDetail = null;       // { id, year, view: 'chart' | 'cards' }
 
   /* ============ 数据层 ============ */
   function getData() {
@@ -88,8 +110,18 @@
     const p = String(s).split('-');
     return new Date(+p[0], +p[1] - 1, +p[2]);
   }
+  // 更严格的日期解析：非法返回 null
+  function parseLocalDate(s) {
+    if (!s || typeof s !== 'string') return null;
+    const p = s.split('-');
+    if (p.length !== 3) return null;
+    const y = +p[0], m = +p[1], d = +p[2];
+    if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, m - 1, d);
+    if (isNaN(dt.getTime())) return null;
+    return dt;
+  }
 
-  // 返回给定日期所属的预算周期（含自定义起始日）
   function getCycleRange(anchor) {
     const startDay = getData().cycleStartDay;
     const d = new Date(anchor);
@@ -102,7 +134,6 @@
     const start = new Date(startY, startM, startDay);
     let endM = startM + 1, endY = startY;
     if (endM > 11) { endM = 0; endY++; }
-    // end 是下周期的前一天
     const end = new Date(endY, endM, startDay);
     end.setDate(end.getDate() - 1);
     end.setHours(23, 59, 59, 999);
@@ -181,7 +212,6 @@
     }
     const maxVal = Math.max(1, ...data.map(d => Math.max(d.income, d.expense)));
 
-    // y 轴网格
     let grid = '';
     for (let i = 0; i <= 4; i++) {
       const y = padT + ch * i / 4;
@@ -336,7 +366,7 @@
         return true;
       }
 
-      /* ---- 流水页的 周/月/年 切换 ---- */
+      /* ---- 流水页 周/月/年 ---- */
       if (act === 'ledger-range') {
         viewRange = el.dataset.range;
         ctx.refresh();
@@ -360,7 +390,7 @@
         return true;
       }
 
-      /* ---- 设置周期起始日 + 预算 ---- */
+      /* ---- 预算设置 ---- */
       if (act === 'ledger-set-cycle') {
         const data = getData();
         UI.form('预算设置', [
@@ -381,7 +411,34 @@
         return true;
       }
 
-      /* ---- 账户：转发到独立函数 ---- */
+      /* ---- 账户：详情页导航 ---- */
+      if (act === 'acc-detail') {
+        const id = el.dataset.id;
+        accDetail = { id, year: new Date().getFullYear(), view: 'chart' };
+        ctx.refresh();
+        return true;
+      }
+      if (act === 'acc-detail-back') {
+        accDetail = null;
+        ctx.refresh();
+        return true;
+      }
+      if (act === 'acc-detail-view') {
+        if (accDetail) {
+          accDetail.view = el.dataset.view;
+          ctx.refresh();
+        }
+        return true;
+      }
+      if (act === 'acc-detail-year') {
+        if (accDetail) {
+          accDetail.year = Number(el.dataset.year);
+          ctx.refresh();
+        }
+        return true;
+      }
+
+      /* ---- 账户：转发 ---- */
       if (act === 'acc-add')          { doAccAdd(); return true; }
       if (act === 'acc-action-sheet') { openAccActionSheet(el.dataset.id); return true; }
       if (act === 'acc-add-money')    { doAccAddMoney(el.dataset.id); return true; }
@@ -396,6 +453,21 @@
   /* ============ 主页面 ============ */
   function renderPage() {
     const data = getData();
+
+    /* ---- 账户详情页 ---- */
+    if (accDetail) {
+      const acc = data.accounts.find(a => a.id === accDetail.id);
+      if (!acc) { accDetail = null; }
+      else {
+        try {
+          return renderAccDetail(acc);
+        } catch (e) {
+          console.error('[ledger] renderAccDetail error:', e);
+          accDetail = null;
+        }
+      }
+    }
+
     const settingParts = ['周期 ' + data.cycleStartDay + ' 号起'];
     if (data.budget > 0) settingParts.push('预算 ' + fmtFen(data.budget));
 
@@ -470,7 +542,6 @@
         </div>
       </div>`;
 
-    // 预算条
     const bs = computeBudgetStatus();
     const budgetBar = bs ? `
       <div class="ledger-budget">
@@ -499,7 +570,6 @@
         <button class="btn btn-primary" data-act="ledger-add" style="margin-top:12px">+ 记一笔</button>
       </div>`;
     }
-    // 按日期分组
     const byDate = {};
     recs.forEach(r => {
       const d = r.date || '';
@@ -695,23 +765,34 @@
       <button class="btn btn-ghost acc-add-btn" data-act="acc-add">+ 新建存钱计划</button>`;
   }
 
+  /* ============ 账户卡片（含背景色方案） ============ */
   function renderAccCard(a) {
     const hasTarget = a.target > 0;
     const pct = hasTarget ? Math.min(100, Math.round(a.amount / a.target * 100 * 100) / 100) : 0;
     const remain = hasTarget ? Math.max(0, a.target - a.amount) : 0;
     const isDone = hasTarget && a.amount >= a.target;
 
-    const gradients = [
-      'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
-      'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
-      'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)',
-      'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
-      'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)'
-    ];
-    const fallbackBg = gradients[(a.name || '').length % gradients.length];
-    const bgStyle = a.image
-      ? `background-image: url('${U.escape(a.image)}');`
-      : `background-image: ${fallbackBg};`;
+    // 背景：图片 > 主题色 > 自动分配
+    let bgStyle = '';
+    if (a.image) {
+      bgStyle = `background-image: url('${U.escape(a.image)}');`;
+    } else {
+      const theme = a.theme && a.theme !== 'auto' ? getTheme(a.theme) : null;
+      if (theme && theme.grad) {
+        bgStyle = `background-image: ${theme.grad};`;
+      } else {
+        const fallback = [
+          'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+          'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
+          'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)',
+          'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+          'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)'
+        ][(a.name || '').length % 5];
+        bgStyle = `background-image: ${fallback};`;
+      }
+    }
+
+    const timeInfo = computeTimeProgress(a);
 
     return `<div class="acc-card-image" style="${bgStyle}" data-act="acc-action-sheet" data-id="${a.id}">
       <div class="acc-card-overlay">
@@ -729,6 +810,13 @@
           <div class="acc-card-bar-fill" style="width:${pct}%"></div>
         </div>
 
+        ${timeInfo ? `
+          <div class="acc-card-time">
+            <span class="acc-card-time-label">📅 ${timeInfo.rangeText}</span>
+            <span class="acc-card-time-pct ${timeInfo.statusCls}">时间已用 ${timeInfo.timePct}%</span>
+          </div>
+        ` : ''}
+
         <div class="acc-card-foot">
           <span class="acc-card-saved">已攒入：¥ ${fenToYuan(a.amount)}</span>
           <span class="acc-card-remain">${isDone ? '已达成 🎉' : '剩余：¥ ' + fenToYuan(remain)}</span>
@@ -737,16 +825,59 @@
     </div>`;
   }
 
-  /* =========================================================
-     账户操作：独立函数（handleAction 和底部菜单共用）
-     ========================================================= */
+  /* ============ 时间进度（防御式） ============ */
+  function computeTimeProgress(acc) {
+    try {
+      if (!acc || !acc.startDate || !acc.endDate) return null;
+      const start = parseLocalDate(acc.startDate);
+      const end = parseLocalDate(acc.endDate);
+      if (!start || !end || end <= start) return null;
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+      const passedDays = Math.max(0, Math.round((today - start) / 86400000) + 1);
+      const remainDays = Math.max(0, Math.round((end - today) / 86400000));
+
+      const timePct = Math.min(100, Math.round(passedDays / totalDays * 100));
+
+      const target = Number(acc.target) || 0;
+      const amount = Number(acc.amount) || 0;
+      const moneyPct = target > 0
+        ? Math.min(100, Math.round(amount / target * 100))
+        : 0;
+
+      let statusCls = 'ok';
+      if (timePct - moneyPct > 15) statusCls = 'behind';
+      else if (moneyPct - timePct > 15) statusCls = 'ahead';
+
+      const f = d => (d.getMonth() + 1) + '/' + d.getDate();
+
+      return {
+        start, end,
+        totalDays, passedDays, remainDays,
+        timePct, moneyPct,
+        statusCls,
+        rangeText: f(start) + ' - ' + f(end)
+      };
+    } catch (e) {
+      console.warn('[ledger] computeTimeProgress error:', e);
+      return null;
+    }
+  }
+
+  /* ============ 账户操作 ============ */
   function doAccAdd() {
+    const themeOptions = ACC_THEMES.map(t => ({ value: t.id, label: t.name }));
     UI.form('新建存钱计划', [
       { name: 'name', label: '计划名称', required: true, placeholder: '例如：旅行基金' },
       { name: 'target', label: '目标金额', type: 'number', value: '', required: true },
       { name: 'amount', label: '已攒入金额', type: 'number', value: 0, required: true },
-      { name: 'image',  label: '背景图片链接（可留空，自动使用渐变）', value: '' }
+      { name: 'startDate', label: '开始日期（可留空）', type: 'date', value: '' },
+      { name: 'endDate',   label: '结束日期（可留空）', type: 'date', value: '' },
+      { name: 'theme', label: '背景色方案', type: 'select', value: 'auto', options: themeOptions },
+      { name: 'image',  label: '背景图片链接（可留空，优先于背景色）', value: '' }
     ]).then(r => {
       if (!r) return;
       const amtFen = yuanToFen(r.amount) || 0;
@@ -757,7 +888,18 @@
           name: r.name,
           target: tgtFen,
           amount: amtFen,
+          startDate: r.startDate || null,
+          endDate: r.endDate || null,
+          theme: r.theme || 'auto',
           image: r.image || '',
+          transactions: amtFen > 0 ? [{
+            id: U.uid('tx'),
+            type: 'in',
+            amount: amtFen,
+            note: '初始金额',
+            date: r.startDate || U.todayStr(),
+            createdAt: Date.now()
+          }] : [],
           createdAt: Date.now()
         });
         return d;
@@ -769,14 +911,26 @@
     const acc = getData().accounts.find(a => a.id === id);
     if (!acc) return;
     UI.form('存入「' + acc.name + '」', [
-      { name: 'amt', label: '存入金额', type: 'number', value: '', required: true }
+      { name: 'amt', label: '存入金额', type: 'number', value: '', required: true },
+      { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
+      { name: 'note', label: '备注（可选）', value: '' }
     ]).then(r => {
       if (!r) return;
       const fen = yuanToFen(r.amt);
       if (!fen) return;
       Store.update(KEY, d => {
         const t = d.accounts.find(x => x.id === id);
-        if (t) t.amount += fen;
+        if (!t) return d;
+        t.amount = (t.amount || 0) + fen;
+        if (!t.transactions) t.transactions = [];
+        t.transactions.push({
+          id: U.uid('tx'),
+          type: 'in',
+          amount: fen,
+          note: (r.note || '').trim(),
+          date: r.date || U.todayStr(),
+          createdAt: Date.now()
+        });
         return d;
       });
       UI.toast('已存入');
@@ -787,14 +941,26 @@
     const acc = getData().accounts.find(a => a.id === id);
     if (!acc) return;
     UI.form('从「' + acc.name + '」取出', [
-      { name: 'amt', label: '取出金额', type: 'number', value: '', required: true }
+      { name: 'amt', label: '取出金额', type: 'number', value: '', required: true },
+      { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
+      { name: 'note', label: '备注（可选）', value: '' }
     ]).then(r => {
       if (!r) return;
       const fen = yuanToFen(r.amt);
       if (!fen) return;
       Store.update(KEY, d => {
         const t = d.accounts.find(x => x.id === id);
-        if (t) t.amount = Math.max(0, t.amount - fen);
+        if (!t) return d;
+        t.amount = Math.max(0, (t.amount || 0) - fen);
+        if (!t.transactions) t.transactions = [];
+        t.transactions.push({
+          id: U.uid('tx'),
+          type: 'out',
+          amount: fen,
+          note: (r.note || '').trim(),
+          date: r.date || U.todayStr(),
+          createdAt: Date.now()
+        });
         return d;
       });
       UI.toast('已取出');
@@ -804,25 +970,45 @@
   function doAccEdit(id) {
     const acc = getData().accounts.find(a => a.id === id);
     if (!acc) return;
+    const oldAmount = acc.amount || 0;
+    const themeOptions = ACC_THEMES.map(t => ({ value: t.id, label: t.name }));
     UI.form('编辑计划', [
       { name: 'name', label: '计划名称', required: true, value: acc.name },
       { name: 'target', label: '目标金额', type: 'number', value: fenToYuan(acc.target || 0), required: true },
-      { name: 'amount', label: '已攒入金额', type: 'number', value: fenToYuan(acc.amount), required: true },
+      { name: 'amount', label: '当前余额（直接改会生成"调整"记录）', type: 'number', value: fenToYuan(acc.amount), required: true },
+      { name: 'startDate', label: '开始日期（可留空）', type: 'date', value: acc.startDate || '' },
+      { name: 'endDate',   label: '结束日期（可留空）', type: 'date', value: acc.endDate || '' },
+      { name: 'theme', label: '背景色方案', type: 'select', value: acc.theme || 'auto', options: themeOptions },
       { name: 'image',  label: '背景图片链接（可留空）', value: acc.image || '' }
     ]).then(r => {
       if (!r) return;
       const amtFen = yuanToFen(r.amount) || 0;
       const tgtFen = yuanToFen(r.target) || 0;
+      const diff = amtFen - oldAmount;
       Store.update(KEY, d => {
         const t = d.accounts.find(x => x.id === id);
-        if (t) {
-          t.name = r.name;
-          t.target = tgtFen;
-          t.amount = amtFen;
-          t.image = r.image || '';
+        if (!t) return d;
+        t.name = r.name;
+        t.target = tgtFen;
+        t.amount = amtFen;
+        t.startDate = r.startDate || null;
+        t.endDate = r.endDate || null;
+        t.theme = r.theme || 'auto';
+        t.image = r.image || '';
+        if (diff !== 0) {
+          if (!t.transactions) t.transactions = [];
+          t.transactions.push({
+            id: U.uid('tx'),
+            type: diff > 0 ? 'in' : 'out',
+            amount: Math.abs(diff),
+            note: '手动调整',
+            date: U.todayStr(),
+            createdAt: Date.now()
+          });
         }
         return d;
       });
+      UI.toast('已保存');
     });
   }
 
@@ -867,6 +1053,9 @@
             <span class="acc-sheet-icon">🗑️</span>删除
           </button>
         </div>
+        <button class="acc-sheet-btn acc-sheet-detail" data-acc-act="detail">
+          <span class="acc-sheet-icon">📊</span>查看详情
+        </button>
         <button class="acc-sheet-cancel" data-acc-act="cancel">取消</button>
       </div>`;
 
@@ -879,12 +1068,15 @@
       if (!btn) return;
       const act = btn.dataset.accAct;
       closeAccSheet();
-      // 等底部面板收起来再弹新表单，避免动画打架
       setTimeout(() => {
         if (act === 'add')       doAccAddMoney(id);
         else if (act === 'sub')  doAccSubMoney(id);
         else if (act === 'edit') doAccEdit(id);
         else if (act === 'del')  doAccDel(id);
+        else if (act === 'detail') {
+          accDetail = { id, year: new Date().getFullYear(), view: 'chart' };
+          if (window.App && App.render) App.render();
+        }
       }, 220);
     });
 
@@ -1117,5 +1309,275 @@
       if (mask.parentNode) mask.parentNode.removeChild(mask);
       sheetState = null;
     }, 200);
+  }
+
+  /* =========================================================
+     账户详情页
+     ========================================================= */
+  function renderAccDetail(acc) {
+    const year = accDetail.year;
+    const view = accDetail.view;
+    const curYear = new Date().getFullYear();
+
+    const txs = (acc.transactions || []).filter(t =>
+      (t.date || '').slice(0, 4) === String(year)
+    );
+
+    const monthly = [];
+    for (let m = 1; m <= 12; m++) {
+      const mk = year + '-' + U.pad(m);
+      const monthTxs = txs.filter(t => (t.date || '').slice(0, 7) === mk);
+      const income = monthTxs.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
+      const outcome = monthTxs.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+      monthly.push({
+        month: m,
+        label: m + '月',
+        income, outcome,
+        net: income - outcome,
+        count: monthTxs.length
+      });
+    }
+
+    const totalIn = monthly.reduce((s, m) => s + m.income, 0);
+    const totalOut = monthly.reduce((s, m) => s + m.outcome, 0);
+    const totalNet = totalIn - totalOut;
+
+    const header = `
+      <div class="acc-detail-head">
+        <button class="acc-detail-back" data-act="acc-detail-back">‹ 返回</button>
+        <div class="acc-detail-title">
+          <span class="acc-detail-icon">${U.escape(acc.icon || '💼')}</span>
+          <span class="acc-detail-name">${U.escape(acc.name)}</span>
+        </div>
+      </div>`;
+
+    const balancePct = acc.target > 0
+      ? Math.min(100, Math.round(acc.amount / acc.target * 100 * 100) / 100)
+      : 0;
+    const balanceCard = `
+      <div class="acc-detail-balance-card">
+        <div class="acc-detail-balance-label">当前余额</div>
+        <div class="acc-detail-balance">${fmtFen(acc.amount || 0)}</div>
+        ${acc.target > 0 ? `
+          <div class="acc-detail-balance-bar">
+            <i style="width:${Math.min(100, balancePct)}%"></i>
+          </div>
+          <div class="acc-detail-balance-meta">
+            目标 ${fmtFen(acc.target)} · 已完成 ${balancePct.toFixed(1)}%
+          </div>
+        ` : `
+          <div class="acc-detail-balance-meta">未设目标金额</div>
+        `}
+      </div>`;
+
+    const timeInfo = computeTimeProgress(acc);
+    let timeCard = '';
+    if (timeInfo) {
+      const f = d => d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+
+      const remainAmount = Math.max(0, (acc.target || 0) - (acc.amount || 0));
+      const needPerDay = timeInfo.remainDays > 0 ? remainAmount / timeInfo.remainDays : 0;
+      const needPerWeek = needPerDay * 7;
+      const needPerMonth = needPerDay * 30;
+
+      const gap = timeInfo.moneyPct - timeInfo.timePct;
+      let statusText = '', statusCls = 'ok';
+      if ((acc.amount || 0) >= (acc.target || 0) && acc.target > 0) {
+        statusText = '🎉 已达成目标';
+        statusCls = 'done';
+      } else if (timeInfo.remainDays === 0) {
+        statusText = '⏰ 计划已到期';
+        statusCls = 'over';
+      } else if (gap >= -5) {
+        statusText = '✅ 进度正常';
+        statusCls = 'ok';
+      } else if (gap >= -20) {
+        statusText = '⚠️ 稍落后 ' + Math.abs(gap) + '%';
+        statusCls = 'warn';
+      } else {
+        statusText = '❗ 落后 ' + Math.abs(gap) + '%，需要加速';
+        statusCls = 'over';
+      }
+
+      const remainText = remainAmount > 0 ? `
+        <div class="acc-time-suggestion">
+          <div class="ats-title">按计划还需攒</div>
+          <div class="ats-grid">
+            <div class="ats-item">
+              <span class="ats-num">${fmtFen(Math.ceil(needPerDay))}</span>
+              <span class="ats-label">每天</span>
+            </div>
+            <div class="ats-item">
+              <span class="ats-num">${fmtFen(Math.ceil(needPerWeek))}</span>
+              <span class="ats-label">每周</span>
+            </div>
+            <div class="ats-item">
+              <span class="ats-num">${fmtFen(Math.ceil(needPerMonth))}</span>
+              <span class="ats-label">每月</span>
+            </div>
+          </div>
+        </div>` : '';
+
+      timeCard = `
+        <div class="acc-time-card">
+          <div class="acc-time-title">
+            <span>📅 计划周期</span>
+            <span class="acc-time-status ${statusCls}">${statusText}</span>
+          </div>
+          <div class="acc-time-range">${f(timeInfo.start)} → ${f(timeInfo.end)}</div>
+          <div class="acc-time-meta">
+            已过 ${timeInfo.passedDays} 天 / 共 ${timeInfo.totalDays} 天
+            ${timeInfo.remainDays > 0 ? ' · 还剩 ' + timeInfo.remainDays + ' 天' : ''}
+          </div>
+          <div class="acc-time-bar">
+            <i style="width:${timeInfo.timePct}%"></i>
+            <span class="acc-time-bar-mark" style="left:${Math.min(100, timeInfo.moneyPct)}%"></span>
+          </div>
+          <div class="acc-time-bar-labels">
+            <span>时间进度 ${timeInfo.timePct}%</span>
+            <span>金额进度 ${timeInfo.moneyPct}%</span>
+          </div>
+          ${remainText}
+        </div>`;
+    }
+
+    const yearNav = `
+      <div class="acc-detail-year">
+        <button class="sum-nav" data-act="acc-detail-year" data-year="${year - 1}">‹</button>
+        <span class="acc-detail-year-title">
+          ${year} 年
+          ${year === curYear ? '<span class="sum-now-tag">今年</span>' : ''}
+        </span>
+        <button class="sum-nav" data-act="acc-detail-year" data-year="${year + 1}"
+          ${year >= curYear ? 'disabled' : ''}>›</button>
+      </div>`;
+
+    const viewSwitch = `
+      <div class="tabs acc-detail-tabs">
+        <button class="tab ${view === 'chart' ? 'active' : ''}" data-act="acc-detail-view" data-view="chart">折线图</button>
+        <button class="tab ${view === 'cards' ? 'active' : ''}" data-act="acc-detail-view" data-view="cards">月度卡片</button>
+      </div>`;
+
+    const summary = `
+      <div class="acc-detail-summary">
+        <div class="ads-item">
+          <span class="ads-label">全年存入</span>
+          <span class="ads-value income">+${fmtFen(totalIn)}</span>
+        </div>
+        <div class="ads-item">
+          <span class="ads-label">全年取出</span>
+          <span class="ads-value outcome">-${fmtFen(totalOut)}</span>
+        </div>
+        <div class="ads-item">
+          <span class="ads-label">全年净变化</span>
+          <span class="ads-value ${totalNet >= 0 ? 'income' : 'outcome'}">
+            ${totalNet >= 0 ? '+' : '-'}${fmtFen(Math.abs(totalNet))}
+          </span>
+        </div>
+      </div>`;
+
+    let body = '';
+    if (view === 'chart') body = renderAccChart(monthly);
+    else body = renderAccCards(monthly, year);
+
+    return `<div class="module ledger-module acc-detail-page">
+      ${header}
+      ${balanceCard}
+      ${timeCard}
+      ${yearNav}
+      ${viewSwitch}
+      ${summary}
+      ${body}
+    </div>`;
+  }
+
+  function renderAccChart(monthly) {
+    const W = 360, H = 220;
+    const padL = 46, padR = 14, padT = 16, padB = 32;
+    const cw = W - padL - padR;
+    const ch = H - padT - padB;
+
+    const maxVal = Math.max(1, ...monthly.map(m => Math.max(m.income, m.outcome)));
+    const yMax = Math.max(100, Math.ceil(maxVal / 100) * 100);
+    const yScale = v => padT + ((yMax - v) / yMax) * ch;
+    const xScale = i => padL + (i / 11) * cw;
+
+    let grid = '';
+    for (let i = 0; i <= 4; i++) {
+      const v = yMax - (yMax / 4) * i;
+      const y = padT + ch * i / 4;
+      grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#e8eef5" stroke-dasharray="3 4"/>`;
+      grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${fmtFen(Math.round(v))}</text>`;
+    }
+
+    const inPts = monthly.map((m, i) => [xScale(i), yScale(m.income)]);
+    const outPts = monthly.map((m, i) => [xScale(i), yScale(m.outcome)]);
+
+    const inLine = `<polyline points="${inPts.map(p => p.join(',')).join(' ')}"
+      fill="none" stroke="#4caf7d" stroke-width="2.4"
+      stroke-linejoin="round" stroke-linecap="round"/>`;
+    const outLine = `<polyline points="${outPts.map(p => p.join(',')).join(' ')}"
+      fill="none" stroke="#e35d5d" stroke-width="2.4"
+      stroke-linejoin="round" stroke-linecap="round"/>`;
+
+    let inDots = '', outDots = '';
+    monthly.forEach((m, i) => {
+      if (m.income > 0) {
+        inDots += `<circle cx="${xScale(i)}" cy="${yScale(m.income)}" r="3.2"
+          fill="#4caf7d" stroke="#fff" stroke-width="1.6"/>`;
+      }
+      if (m.outcome > 0) {
+        outDots += `<circle cx="${xScale(i)}" cy="${yScale(m.outcome)}" r="3.2"
+          fill="#e35d5d" stroke="#fff" stroke-width="1.6"/>`;
+      }
+    });
+
+    let xLabels = '';
+    monthly.forEach((m, i) => {
+      xLabels += `<text x="${xScale(i)}" y="${H - 10}" text-anchor="middle"
+        font-size="9" fill="#a8b3c1">${m.month}月</text>`;
+    });
+
+    return `<div class="acc-detail-chart">
+      <div class="acc-detail-legend">
+        <span><i class="adl-dot in"></i>存入</span>
+        <span><i class="adl-dot out"></i>取出</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+        ${grid}
+        <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
+        ${inLine}
+        ${outLine}
+        ${inDots}
+        ${outDots}
+        ${xLabels}
+      </svg>
+    </div>`;
+  }
+
+  function renderAccCards(monthly, year) {
+    const cards = monthly.map(m => {
+      const hasData = m.income > 0 || m.outcome > 0;
+      return `<div class="acc-month-card ${hasData ? '' : 'empty'}">
+        <div class="acc-month-title">${m.month}月</div>
+        ${hasData ? `
+          <div class="acc-month-row">
+            <span class="acc-month-label">存入</span>
+            <span class="acc-month-val income">+${fmtFen(m.income)}</span>
+          </div>
+          <div class="acc-month-row">
+            <span class="acc-month-label">取出</span>
+            <span class="acc-month-val outcome">-${fmtFen(m.outcome)}</span>
+          </div>
+          <div class="acc-month-net ${m.net >= 0 ? 'income' : 'outcome'}">
+            ${m.net >= 0 ? '+' : '-'}${fmtFen(Math.abs(m.net))}
+          </div>
+        ` : `
+          <div class="acc-month-empty">无记录</div>
+        `}
+      </div>`;
+    }).join('');
+
+    return `<div class="acc-detail-cards">${cards}</div>`;
   }
 })();

@@ -253,3 +253,11 @@
   border-color: var(--primary);
   color: var(--primary-deep);
 }
+/* ============ 睡眠/清醒 视图切换 ============ */
+.sleep-chart-tabs {
+  margin-bottom: 12px;
+}
+.sleep-chart-tabs .tab {
+  font-size: 12.5px;
+  padding: 7px 10px;
+}

@@ -2,6 +2,7 @@ let listLimit = 10;   // 列表默认显示条数
 (function () {
   const KEY = 'sleep';
   let viewRange = 'week';   // week | month | year
+  let chartView = 'sleep';   // 'sleep' | 'awake'
   let anchorDate = null;
 
   /* =========================================================
@@ -279,6 +280,151 @@ let listLimit = 10;   // 列表默认显示条数
       ${xLabels}
     </svg>`;
   }
+    /* =========================================================
+     清醒总时长柱状图
+     ========================================================= */
+  function buildAwakeBarChart(series) {
+    const W = 360, H = 180;
+    const padL = 46, padR = 14, padT = 18, padB = 32;
+    const cw = W - padL - padR;
+    const ch = H - padT - padB;
+
+    const valid = series.filter(s => s.awakeTime != null && s.awakeTime >= 0);
+
+    if (!valid.length) {
+      return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+        <text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#b8c0cc" font-size="13">暂无清醒时长数据</text>
+      </svg>`;
+    }
+
+    let maxVal = Math.max(1, ...valid.map(s => s.awakeTime));
+    maxVal = Math.max(10, Math.ceil(maxVal / 10) * 10);
+
+    const yScale = v => padT + ((maxVal - v) / maxVal) * ch;
+
+    let grid = '';
+    for (let i = 0; i <= 4; i++) {
+      const v = maxVal - (maxVal / 4) * i;
+      const y = padT + ch * i / 4;
+      grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#e8eef5" stroke-dasharray="3 4"/>`;
+      grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${Math.round(v)}分</text>`;
+    }
+
+    const colW = cw / series.length;
+    const barW = Math.max(8, Math.min(28, colW * 0.55));
+    const maxLabels = 7;
+    const step = Math.max(1, Math.ceil(series.length / maxLabels));
+
+    let bars = '';
+    let xLabels = '';
+
+    series.forEach((s, i) => {
+      const cx = padL + colW * (i + 0.5);
+      if (s.awakeTime != null && s.awakeTime > 0) {
+        const h = (s.awakeTime / maxVal) * ch;
+        const y = padT + ch - h;
+        bars += `<rect x="${cx - barW / 2}" y="${y}" width="${barW}" height="${h}" rx="3"
+          fill="url(#awakeBarGrad)"/>`;
+        // 值标在柱子上
+        bars += `<text x="${cx}" y="${y - 3}" text-anchor="middle"
+          font-size="9" font-weight="600" fill="#b8760a">${s.awakeTime}</text>`;
+      }
+      if (i % step === 0 || i === series.length - 1) {
+        xLabels += `<text x="${cx}" y="${H - 10}" text-anchor="middle"
+          font-size="9" fill="#a8b3c1">${U.escape(s.label)}</text>`;
+      }
+    });
+
+    return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="awakeBarGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f0a020" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#fad9a3" stop-opacity="0.35"/>
+        </linearGradient>
+      </defs>
+      ${grid}
+      <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
+      ${bars}
+      ${xLabels}
+    </svg>`;
+  }
+
+  /* =========================================================
+     清醒次数折线图
+     ========================================================= */
+  function buildAwakeLineChart(series) {
+    const W = 360, H = 180;
+    const padL = 46, padR = 14, padT = 18, padB = 32;
+    const cw = W - padL - padR;
+    const ch = H - padT - padB;
+
+    const valid = series.filter(s => s.awakeCount != null);
+
+    if (!valid.length) {
+      return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+        <text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#b8c0cc" font-size="13">暂无清醒次数数据</text>
+      </svg>`;
+    }
+
+    let maxVal = Math.max(1, ...valid.map(s => s.awakeCount));
+    maxVal = Math.max(2, Math.ceil(maxVal));
+
+    const yScale = v => padT + ((maxVal - v) / maxVal) * ch;
+    const xScale = i => series.length === 1
+      ? padL + cw / 2
+      : padL + (i / (series.length - 1)) * cw;
+
+    let grid = '';
+    const steps = Math.min(maxVal, 4);
+    for (let i = 0; i <= steps; i++) {
+      const v = maxVal - (maxVal / steps) * i;
+      const y = padT + ch * i / steps;
+      grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#e8eef5" stroke-dasharray="3 4"/>`;
+      grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${Math.round(v)}次</text>`;
+    }
+
+    // 收集有效点
+    const pts = [];
+    series.forEach((s, i) => {
+      if (s.awakeCount != null) {
+        pts.push({ x: xScale(i), y: yScale(s.awakeCount), v: s.awakeCount });
+      }
+    });
+
+    let polyline = '';
+    if (pts.length > 1) {
+      polyline = `<polyline points="${pts.map(p => p.x + ',' + p.y).join(' ')}"
+        fill="none" stroke="#c96a88" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+
+    let dots = '';
+    pts.forEach(p => {
+      dots += `<circle cx="${p.x}" cy="${p.y}" r="3.5"
+        fill="#c96a88" stroke="#fff" stroke-width="1.8"/>`;
+      if (maxVal <= 8) {
+        dots += `<text x="${p.x}" y="${p.y - 7}" text-anchor="middle"
+          font-size="9" font-weight="600" fill="#c96a88">${p.v}</text>`;
+      }
+    });
+
+    const maxLabels = 7;
+    const step = Math.max(1, Math.ceil(series.length / maxLabels));
+    let xLabels = '';
+    series.forEach((s, i) => {
+      if (i % step !== 0 && i !== series.length - 1) return;
+      xLabels += `<text x="${xScale(i)}" y="${H - 10}" text-anchor="middle"
+        font-size="9" fill="#a8b3c1">${U.escape(s.label)}</text>`;
+    });
+
+    return `<svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
+      ${grid}
+      <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
+      ${polyline}
+      ${dots}
+      ${xLabels}
+    </svg>`;
+  }
   /* =========================================================
      序列化（跨天/跨范围）
      ========================================================= */
@@ -409,6 +555,11 @@ let listLimit = 10;   // 列表默认显示条数
         ctx.refresh();
         return true;
       }
+            if (act === 'sleep-chart-view') {
+        chartView = el.dataset.view;
+        ctx.refresh();
+        return true;
+      }
             /* 加载更多 */
       if (act === 'sleep-load-more') {
         listLimit += 20;
@@ -469,9 +620,10 @@ const series = recs.map(r => ({
   })(),
   sleepTime: r.sleepTime,
   wakeTime: r.wakeTime,
-  totalSleep: r.totalSleep
+  totalSleep: r.totalSleep,
+  awakeCount: r.awakeCount,
+  awakeTime: r.awakeTime
 }));
-
     const rangeSwitcher = `
       <div class="tabs">
         <button class="tab ${viewRange === 'week' ? 'active' : ''}" data-act="sleep-range" data-range="week">周</button>
@@ -489,38 +641,64 @@ const series = recs.map(r => ({
         </div>
       </div>`;
 
-const chart = `
-  <div class="chart-card sleep-chart-card">
-    <div class="chart-title">
-      <span>入睡 / 醒来时间</span>
-      <span class="sleep-legend">
-        <i class="dot-sleep"></i>入睡
-        <i class="dot-wake"></i>醒来
-      </span>
-    </div>
-    ${buildSleepChart(series)}
-    <div class="sleep-chart-hint">
-      柱 = 整晚睡眠段 · 线 = 每日入睡/醒来时间
-    </div>
-    <div class="sleep-chart-hint sleep-chart-legend">
-      <span><i class="hint-dot green"></i>7h 及以上</span>
-      <span><i class="hint-dot orange"></i>6~7h</span>
-      <span><i class="hint-dot deepred"></i>少于 6h</span>
-      <span><i class="hint-dash"></i>23:00 计划</span>
-    </div>
+const chartSwitch = `
+  <div class="tabs sleep-chart-tabs">
+    <button class="tab ${chartView === 'sleep' ? 'active' : ''}" data-act="sleep-chart-view" data-view="sleep">睡眠</button>
+    <button class="tab ${chartView === 'awake' ? 'active' : ''}" data-act="sleep-chart-view" data-view="awake">清醒</button>
   </div>`;
+
+let chart = '';
+if (chartView === 'sleep') {
+  chart = `
+    <div class="chart-card sleep-chart-card">
+      <div class="chart-title">
+        <span>入睡 / 醒来时间</span>
+        <span class="sleep-legend">
+          <i class="dot-sleep"></i>入睡
+          <i class="dot-wake"></i>醒来
+        </span>
+      </div>
+      ${buildSleepChart(series)}
+      <div class="sleep-chart-hint">柱 = 整晚睡眠段 · 线 = 每日入睡/醒来时间</div>
+      <div class="sleep-chart-hint sleep-chart-legend">
+        <span><i class="hint-dot green"></i>7h 及以上</span>
+        <span><i class="hint-dot orange"></i>6~7h</span>
+        <span><i class="hint-dot deepred"></i>少于 6h</span>
+        <span><i class="hint-dash"></i>23:00 计划</span>
+      </div>
+    </div>`;
+} else {
+  chart = `
+    <div class="chart-card sleep-chart-card">
+      <div class="chart-title">
+        <span>清醒总时长</span>
+        <span class="chart-unit">分钟</span>
+      </div>
+      ${buildAwakeBarChart(series)}
+      <div class="sleep-chart-hint">柱 = 每晚清醒总时长</div>
+    </div>
+    <div class="chart-card sleep-chart-card">
+      <div class="chart-title">
+        <span>清醒次数</span>
+        <span class="chart-unit">次</span>
+      </div>
+      ${buildAwakeLineChart(series)}
+      <div class="sleep-chart-hint">线 = 每晚清醒次数</div>
+    </div>`;
+}
 
     const stats = renderStats(recs);
     const list = renderList(recs);
 
-    return `<div class="module sleep-module">
-      ${rangeSwitcher}
-      ${head}
-      ${chart}
-      ${stats}
-      ${list}
-      <button class="fab" data-act="sleep-add" aria-label="新增睡眠记录">+</button>
-    </div>`;
+return `<div class="module sleep-module">
+  ${rangeSwitcher}
+  ${head}
+  ${chartSwitch}
+  ${chart}
+  ${stats}
+  ${list}
+  <button class="fab" data-act="sleep-add" aria-label="新增睡眠记录">+</button>
+</div>`;
   }
 
   /* =========================================================
