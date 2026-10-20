@@ -75,28 +75,7 @@
     if (!Array.isArray(d.archiveItems)) d.archiveItems = [];
     if (!d.cycleStartDay || d.cycleStartDay < 1 || d.cycleStartDay > 28) d.cycleStartDay = 1;
 
-    // 自动检查过期未买的物品：进入页面时触发，过了结束日期自动转为放弃
-    checkExpiredItems(d);
     return d;
-  }
-
-  function checkExpiredItems(d) {
-    const today = U.todayStr();
-    let changed = false;
-    d.coolingItems.forEach(item => {
-      if (item.status === 'cooling' && item.endDate < today) {
-        item.status = 'abandoned';
-        item.abandonReason = '冷静期结束，自动放弃';
-        changed = true;
-      }
-    });
-    if (changed) {
-      const updater = Store.updateSilent || Store.update;
-      updater.call(Store, KEY, data => {
-        data.coolingItems = d.coolingItems;
-        return data;
-      });
-    }
   }
 
   function catsFor(type) {
