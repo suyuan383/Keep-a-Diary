@@ -936,7 +936,35 @@
       UI.toast('已存入');
     });
   }
-
+  function doAccAddProfit(id) {
+    const acc = getData().accounts.find(a => a.id === id);
+    if (!acc) return;
+    UI.form('记录「' + acc.name + '」收益', [
+      { name: 'amt', label: '本次收益金额（元）', type: 'number', value: '', required: true, placeholder: '例如：0.71' },
+      { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
+      { name: 'note', label: '备注（可选）', value: '基金收益' }
+    ]).then(r => {
+      if (!r) return;
+      const fen = yuanToFen(r.amt);
+      if (!fen) return;
+      Store.update(KEY, d => {
+        const t = d.accounts.find(x => x.id === id);
+        if (!t) return d;
+        t.amount = (t.amount || 0) + fen;
+        if (!t.transactions) t.transactions = [];
+        t.transactions.push({
+          id: U.uid('tx'),
+          type: 'profit', // 新增类型：收益
+          amount: fen,
+          note: (r.note || '').trim(),
+          date: r.date || U.todayStr(),
+          createdAt: Date.now()
+        });
+        return d;
+      });
+      UI.toast('已记录收益');
+    });
+  }
   function doAccSubMoney(id) {
     const acc = getData().accounts.find(a => a.id === id);
     if (!acc) return;
@@ -1046,15 +1074,18 @@
           <button class="acc-sheet-btn" data-acc-act="sub">
             <span class="acc-sheet-icon">📤</span>取出
           </button>
+          <button class="acc-sheet-btn" data-acc-act="profit" style="background:#e8f5e9; color:#2e7d32;">
+            <span class="acc-sheet-icon">📈</span>记收益
+          </button>
           <button class="acc-sheet-btn" data-acc-act="edit">
             <span class="acc-sheet-icon">✏️</span>编辑
-          </button>
-          <button class="acc-sheet-btn danger" data-acc-act="del">
-            <span class="acc-sheet-icon">🗑️</span>删除
           </button>
         </div>
         <button class="acc-sheet-btn acc-sheet-detail" data-acc-act="detail">
           <span class="acc-sheet-icon">📊</span>查看详情
+        </button>
+        <button class="acc-sheet-btn danger" data-acc-act="del" style="margin-top:8px;">
+          <span class="acc-sheet-icon">🗑️</span>删除
         </button>
         <button class="acc-sheet-cancel" data-acc-act="cancel">取消</button>
       </div>`;
@@ -1071,6 +1102,7 @@
       setTimeout(() => {
         if (act === 'add')       doAccAddMoney(id);
         else if (act === 'sub')  doAccSubMoney(id);
+        else if (act === 'profit') doAccAddProfit(id); // 新增
         else if (act === 'edit') doAccEdit(id);
         else if (act === 'del')  doAccDel(id);
         else if (act === 'detail') {
@@ -1319,7 +1351,7 @@
     const view = accDetail.view;
     const curYear = new Date().getFullYear();
 
-    const txs = (acc.transactions || []).filter(t =>
+        const txs = (acc.transactions || []).filter(t =>
       (t.date || '').slice(0, 4) === String(year)
     );
 
@@ -1327,20 +1359,25 @@
     for (let m = 1; m <= 12; m++) {
       const mk = year + '-' + U.pad(m);
       const monthTxs = txs.filter(t => (t.date || '').slice(0, 7) === mk);
+      
+      // 区分：本金存入 和 收益
       const income = monthTxs.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
+      const profit = monthTxs.filter(t => t.type === 'profit').reduce((s, t) => s + t.amount, 0);
       const outcome = monthTxs.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+      
       monthly.push({
-        month: m,
-        label: m + '月',
-        income, outcome,
-        net: income - outcome,
+        month: m, label: m + '月',
+        income, profit, outcome,
+        net: income + profit - outcome,
         count: monthTxs.length
       });
     }
 
+    // 总汇总
     const totalIn = monthly.reduce((s, m) => s + m.income, 0);
+    const totalProfit = monthly.reduce((s, m) => s + m.profit, 0);
     const totalOut = monthly.reduce((s, m) => s + m.outcome, 0);
-    const totalNet = totalIn - totalOut;
+    const totalNet = totalIn + totalProfit - totalOut;
 
     const header = `
       <div class="acc-detail-head">
@@ -1458,6 +1495,7 @@
         <button class="tab ${view === 'cards' ? 'active' : ''}" data-act="acc-detail-view" data-view="cards">月度卡片</button>
       </div>`;
 
+    /* ---- 汇总 ---- */
     const summary = `
       <div class="acc-detail-summary">
         <div class="ads-item">
@@ -1465,11 +1503,15 @@
           <span class="ads-value income">+${fmtFen(totalIn)}</span>
         </div>
         <div class="ads-item">
+          <span class="ads-label">全年收益</span>
+          <span class="ads-value profit">+${fmtFen(totalProfit)}</span>
+        </div>
+        <div class="ads-item">
           <span class="ads-label">全年取出</span>
           <span class="ads-value outcome">-${fmtFen(totalOut)}</span>
         </div>
-        <div class="ads-item">
-          <span class="ads-label">全年净变化</span>
+        <div class="ads-item full-width">
+          <span class="ads-label">全年净增长</span>
           <span class="ads-value ${totalNet >= 0 ? 'income' : 'outcome'}">
             ${totalNet >= 0 ? '+' : '-'}${fmtFen(Math.abs(totalNet))}
           </span>
@@ -1511,25 +1553,23 @@
     }
 
     const inPts = monthly.map((m, i) => [xScale(i), yScale(m.income)]);
+    const profitPts = monthly.map((m, i) => [xScale(i), yScale(m.profit)]);
     const outPts = monthly.map((m, i) => [xScale(i), yScale(m.outcome)]);
 
     const inLine = `<polyline points="${inPts.map(p => p.join(',')).join(' ')}"
-      fill="none" stroke="#4caf7d" stroke-width="2.4"
-      stroke-linejoin="round" stroke-linecap="round"/>`;
+      fill="none" stroke="#4caf7d" stroke-width="2" stroke-linejoin="round"/>`;
+      
+    const profitLine = `<polyline points="${profitPts.map(p => p.join(',')).join(' ')}"
+      fill="none" stroke="#f0a020" stroke-width="2" stroke-linejoin="round" stroke-dasharray="4 2"/>`; // 橙色虚线
+      
     const outLine = `<polyline points="${outPts.map(p => p.join(',')).join(' ')}"
-      fill="none" stroke="#e35d5d" stroke-width="2.4"
-      stroke-linejoin="round" stroke-linecap="round"/>`;
+      fill="none" stroke="#e35d5d" stroke-width="2" stroke-linejoin="round"/>`;
 
-    let inDots = '', outDots = '';
+    let inDots = '', profitDots = '', outDots = '';
     monthly.forEach((m, i) => {
-      if (m.income > 0) {
-        inDots += `<circle cx="${xScale(i)}" cy="${yScale(m.income)}" r="3.2"
-          fill="#4caf7d" stroke="#fff" stroke-width="1.6"/>`;
-      }
-      if (m.outcome > 0) {
-        outDots += `<circle cx="${xScale(i)}" cy="${yScale(m.outcome)}" r="3.2"
-          fill="#e35d5d" stroke="#fff" stroke-width="1.6"/>`;
-      }
+      if (m.income > 0) inDots += `<circle cx="${xScale(i)}" cy="${yScale(m.income)}" r="3" fill="#4caf7d" stroke="#fff" stroke-width="1.5"/>`;
+      if (m.profit > 0) profitDots += `<circle cx="${xScale(i)}" cy="${yScale(m.profit)}" r="3" fill="#f0a020" stroke="#fff" stroke-width="1.5"/>`;
+      if (m.outcome > 0) outDots += `<circle cx="${xScale(i)}" cy="${yScale(m.outcome)}" r="3" fill="#e35d5d" stroke="#fff" stroke-width="1.5"/>`;
     });
 
     let xLabels = '';
@@ -1538,17 +1578,20 @@
         font-size="9" fill="#a8b3c1">${m.month}月</text>`;
     });
 
-    return `<div class="acc-detail-chart">
+        return `<div class="acc-detail-chart">
       <div class="acc-detail-legend">
         <span><i class="adl-dot in"></i>存入</span>
+        <span><i class="adl-dot profit"></i>收益</span>
         <span><i class="adl-dot out"></i>取出</span>
       </div>
       <svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">
         ${grid}
         <line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>
         ${inLine}
+        ${profitLine}
         ${outLine}
         ${inDots}
+        ${profitDots}
         ${outDots}
         ${xLabels}
       </svg>
@@ -1557,13 +1600,17 @@
 
   function renderAccCards(monthly, year) {
     const cards = monthly.map(m => {
-      const hasData = m.income > 0 || m.outcome > 0;
+      const hasData = m.income > 0 || m.outcome > 0 || m.profit > 0;
       return `<div class="acc-month-card ${hasData ? '' : 'empty'}">
         <div class="acc-month-title">${m.month}月</div>
         ${hasData ? `
           <div class="acc-month-row">
             <span class="acc-month-label">存入</span>
             <span class="acc-month-val income">+${fmtFen(m.income)}</span>
+          </div>
+          <div class="acc-month-row">
+            <span class="acc-month-label">收益</span>
+            <span class="acc-month-val profit">+${fmtFen(m.profit)}</span>
           </div>
           <div class="acc-month-row">
             <span class="acc-month-label">取出</span>
