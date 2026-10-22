@@ -1365,3 +1365,56 @@
   position: absolute; right: 16px; bottom: 16px;
 }
 .arch-edit-btn:hover { color: var(--primary); }
+/* =====================================================
+   盲盒存钱 & 资产转移
+   ===================================================== */
+.acc-box-grid {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 3px;
+  margin: 10px 0;
+  padding: 10px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+.box-dot {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 1.5px;
+  background: rgba(255,255,255,0.2);
+  transition: background .3s;
+}
+.box-dot.lit { background: #fff; box-shadow: 0 0 4px rgba(255,255,255,0.8); }
+
+.box-hero {
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+  color: #fff; border-radius: var(--radius);
+  padding: 24px; text-align: center;
+  margin-bottom: 16px; box-shadow: 0 6px 20px rgba(166,193,238,0.3);
+}
+.box-hero-label { font-size: 13px; opacity: 0.8; margin-bottom: 6px; }
+.box-hero-val { font-size: 36px; font-weight: 800; line-height: 1.1; margin-bottom: 8px; }
+.box-hero-progress { font-size: 12px; background: rgba(255,255,255,0.2); display: inline-block; padding: 3px 10px; border-radius: 999px; }
+
+.box-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+.box-cell {
+  aspect-ratio: 1; background: #f0f2f5; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: #ccc; transition: all .2s;
+}
+.box-cell.lit {
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+  color: #fff; box-shadow: 0 2px 6px rgba(166,193,238,0.4);
+  animation: popIn .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.box-q { font-size: 16px; }
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.box-open-btn {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 14px;
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+  color: #fff; box-shadow: 0 4px 16px rgba(166,193,238,0.4); border: none;
+}
+
+.ledger-amount.transfer { color: #785fa3; }
+.ledger-cat-icon.transfer { background: #f0ebf8; color: #785fa3; }

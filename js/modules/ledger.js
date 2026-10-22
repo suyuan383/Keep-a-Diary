@@ -12,6 +12,7 @@
     { id: 'study',     icon: '📚', name: '学习', hint: '书、课程、文具' },
     { id: 'comm',      icon: '📱', name: '通讯', hint: '话费、流量、会员订阅' },
     { id: 'gift',      icon: '🎁', name: '人情', hint: '红包、礼物、随礼' },
+    { id: 'transfer',  icon: '🔄', name: '资产转移', hint: '盲盒转入，不计入日常支出' },
     { id: 'other_e',   icon: '📦', name: '其他', hint: '不确定就放这里' }
   ];
   const INCOME_CATS = [
@@ -59,22 +60,15 @@
   /* ============ 数据层 ============ */
   function getData() {
     const d = Store.ensure(KEY, () => ({
-      cycleStartDay: 20,
-      budget: 0,
-      lastAccount: 'wechat',
-      records: [],
-      accounts: [],
-      customExpense: [],
-      customIncome: [],
-      coolingItems: [],
-      archiveItems: []
+      cycleStartDay: 20, budget: 0, lastAccount: 'wechat',
+      records: [], accounts: [], customExpense: [], customIncome: [],
+      coolingItems: [], archiveItems: []
     }));
     if (!Array.isArray(d.records)) d.records = [];
     if (!Array.isArray(d.accounts)) d.accounts = [];
     if (!Array.isArray(d.coolingItems)) d.coolingItems = [];
     if (!Array.isArray(d.archiveItems)) d.archiveItems = [];
     if (!d.cycleStartDay || d.cycleStartDay < 1 || d.cycleStartDay > 28) d.cycleStartDay = 1;
-
     return d;
   }
 
@@ -85,6 +79,7 @@
     return base.concat(custom || []);
   }
   function findCat(type, id) {
+    if (id === 'transfer') return { id: 'transfer', icon: '🔄', name: '资产转移', hint: '不计入日常支出' };
     return catsFor(type).find(c => c.id === id) || { id: id, icon: '❓', name: '未分类', hint: '' };
   }
   function findAcc(id) { return ACCOUNTS.find(a => a.id === id) || null; }
@@ -157,26 +152,24 @@
     }
     if (range === 'month') return getCycleRange(d);
     const y = d.getFullYear();
-    return {
-      start: new Date(y, 0, 1, 0, 0, 0),
-      end: new Date(y, 11, 31, 23, 59, 59)
-    };
+    return { start: new Date(y, 0, 1, 0, 0, 0), end: new Date(y, 11, 31, 23, 59, 59) };
   }
 
   function getAnchor() { if (!anchorDate) anchorDate = new Date(); return anchorDate; }
+  
   function recordsInRange(range) {
     const s = dateStr(range.start);
     const e = dateStr(range.end);
     return getData().records.filter(r => { const d = r.date || ''; return d >= s && d <= e; });
   }
 
-  /* ============ 预算状态 ============ */
+  /* ============ 预算与统计（排除 transfer） ============ */
   function computeBudgetStatus() {
     const data = getData();
     if (!data.budget || data.budget <= 0) return null;
     const range = getCycleRange(new Date());
     const recs = recordsInRange(range);
-    const spent = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const spent = recs.filter(r => r.type === 'expense' && r.category !== 'transfer').reduce((s, r) => s + r.amount, 0);
     const remain = data.budget - spent;
     const rawPct = spent / data.budget * 100;
     const pct = Math.min(999, Math.round(rawPct));
@@ -244,7 +237,7 @@
       const range = getCycleRange(anchor);
       const recs = recordsInRange(range);
       const income = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-      const expense = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+      const expense = recs.filter(r => r.type === 'expense' && r.category !== 'transfer').reduce((s, r) => s + r.amount, 0);
       arr.push({ label: (m + 1) + '月', income, expense });
     }
     return arr;
@@ -252,16 +245,12 @@
 
   /* ============ 注册模块 ============ */
   Registry.register({
-    id: 'ledger',
-    name: '记账',
-    icon: '💰',
-    order: 20,
-    storageKey: KEY,
+    id: 'ledger', name: '记账', icon: '💰', order: 20, storageKey: KEY,
 
     homeCard() {
       const range = getCycleRange(new Date());
       const recs = recordsInRange(range);
-      const expense = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+      const expense = recs.filter(r => r.type === 'expense' && r.category !== 'transfer').reduce((s, r) => s + r.amount, 0);
       const income  = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
       const balance = income - expense;
       const bs = computeBudgetStatus();
@@ -286,7 +275,6 @@
     page() { return renderPage(); },
 
     handleAction(act, el, ctx) {
-      /* ---- 打开记账面板 ---- */
       if (act === 'ledger-add') { openSheet(null); return true; }
       if (act === 'ledger-edit') { const rec = getData().records.find(r => r.id === el.dataset.id); if (rec) openSheet(rec); return true; }
       if (act === 'ledger-del') {
@@ -298,13 +286,43 @@
         return true;
       }
 
-      /* ---- 主 Tab ---- */
       if (act === 'ledger-tab') { viewTab = el.dataset.tab; ctx.refresh(); return true; }
-
-      /* ---- 购物清单 Tab 切换 ---- */
       if (act === 'shop-tab') { shopTab = el.dataset.tab; ctx.refresh(); return true; }
 
-      /* ---- 购物清单 CRUD ---- */
+      /* ---- 盲盒 ---- */
+      if (act === 'acc-open-box') {
+        const id = el.dataset.id;
+        const acc = getData().accounts.find(a => a.id === id);
+        if (!acc) return true;
+        if (acc.litCells >= 100) { UI.toast('已经全部点亮啦！'); return true; }
+
+        const randomFen = (Math.floor(Math.random() * 100) + 1) * 100;
+        
+        UI.confirm(`🎉 抽中 ${randomFen/100} 元！\n确认存入盲盒吗？`).then(ok => {
+          if (!ok) return;
+          Store.update(KEY, d => {
+            const t = d.accounts.find(x => x.id === id);
+            if (!t) return d;
+            t.amount = (t.amount || 0) + randomFen;
+            t.litCells = (t.litCells || 0) + 1;
+            if (!t.transactions) t.transactions = [];
+            t.transactions.push({ id: U.uid('tx'), type: 'in', amount: randomFen, note: '盲盒抽奖', date: U.todayStr(), createdAt: Date.now() });
+            if (!t.boxRecords) t.boxRecords = [];
+            t.boxRecords.push(randomFen);
+
+            d.records.push({
+              id: U.uid('l'), type: 'expense', category: 'transfer', amount: randomFen,
+              account: d.lastAccount || 'wechat', date: U.todayStr(), time: currentTimeStr(),
+              note: `盲盒转入 - ${t.name}`, createdAt: Date.now()
+            });
+            return d;
+          });
+          UI.toast('存入成功！已点亮一格');
+        });
+        return true;
+      }
+
+      /* ---- 购物清单 ---- */
       if (act === 'shop-add-cooling') { openCoolingForm(); return true; }
       if (act === 'shop-add-archive') { openArchiveForm(null); return true; }
       if (act === 'shop-edit-archive') { 
@@ -326,13 +344,8 @@
             const t = d.coolingItems.find(x => x.id === id);
             if (t) { t.status = 'bought'; t.realPrice = realPrice; }
             d.archiveItems.push({
-              id: U.uid('a'),
-              name: item.name,
-              price: realPrice,
-              date: U.todayStr(),
-              status: isEarly ? 'bad' : 'normal', // 如果提前买，默认标记为'bad' (吃灰预警)
-              note: isEarly ? '⚠️ 未坚持冷静期，冲动购买' : '坚持了冷静期后购买',
-              repurchase: false
+              id: U.uid('a'), name: item.name, price: realPrice, date: U.todayStr(),
+              status: isEarly ? 'bad' : 'normal', note: isEarly ? '⚠️ 未坚持冷静期，冲动购买' : '坚持了冷静期后购买', repurchase: false
             });
             return d;
           });
@@ -398,6 +411,7 @@
       const acc = data.accounts.find(a => a.id === accDetail.id);
       if (!acc) { accDetail = null; }
       else {
+        if (acc.isBlindBox) return renderBoxDetail(acc);
         try { return renderAccDetail(acc); }
         catch (e) { console.error(e); accDetail = null; }
       }
@@ -432,7 +446,292 @@
     </div>`;
   }
 
-  /* ============ 购物清单渲染 ============ */
+  /* ============ 流水页 ============ */
+  function renderList() {
+    const range = getRangeFor(viewRange, getAnchor());
+    const recs = recordsInRange(range);
+    const expense = recs.filter(r => r.type === 'expense' && r.category !== 'transfer').reduce((s, r) => s + r.amount, 0);
+    const income  = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const balance = income - expense;
+
+    const rangeSwitcher = `<div class="ledger-range-switch"><button class="${viewRange === 'week' ? 'active' : ''}" data-act="ledger-range" data-range="week">周</button><button class="${viewRange === 'month' ? 'active' : ''}" data-act="ledger-range" data-range="month">月</button><button class="${viewRange === 'year' ? 'active' : ''}" data-act="ledger-range" data-range="year">年</button></div>`;
+    const head = `<div class="ledger-range-head"><button class="sum-nav" data-act="ledger-prev">‹</button><span class="ledger-range-title">${fmtRangeLabel(range)}</span><div class="ledger-range-right"><button class="sum-now" data-act="ledger-now">现在</button><button class="sum-nav" data-act="ledger-next">›</button></div></div>`;
+    const summary = `<div class="ledger-summary"><div class="ls-item"><span class="ls-label">支出</span><span class="ls-val expense">${fmtFen(expense)}</span></div><div class="ls-item"><span class="ls-label">收入</span><span class="ls-val income">${fmtFen(income)}</span></div><div class="ls-item"><span class="ls-label">结余</span><span class="ls-val ${balance >= 0 ? 'ok' : 'bad'}">${balance >= 0 ? '' : '-'}${fmtFen(Math.abs(balance))}</span></div></div>`;
+    const bs = computeBudgetStatus();
+    const budgetBar = bs ? `<div class="ledger-budget"><div class="lb-head"><span class="lb-title">📊 本周期预算</span><span class="lb-pct ${bs.cls}">${bs.pct}%</span></div><div class="lb-bar"><i class="${bs.cls}" style="width:${Math.min(100, bs.pct)}%"></i></div><div class="lb-foot"><span>已花 ${fmtFen(bs.spent)}</span><span class="${bs.cls}">${bs.remain >= 0 ? '剩余 ' + fmtFen(bs.remain) + ' / ' + fmtFen(bs.budget) : '超支 ' + fmtFen(-bs.remain)}</span></div></div>` : '';
+    
+    return `${rangeSwitcher}${head}${summary}${budgetBar}${renderFlowList(recs)}`;
+  }
+
+  function renderFlowList(recs) {
+    if (!recs.length) return `<div class="empty" style="padding:30px 16px">本周期暂无记录<br><button class="btn btn-primary" data-act="ledger-add" style="margin-top:12px">+ 记一笔</button></div>`;
+    const byDate = {};
+    recs.forEach(r => { (byDate[r.date || ''] = byDate[r.date || ''] || []).push(r); });
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+    
+    return `<div class="ledger-list">` + dates.map(date => {
+      const dayRecs = byDate[date].slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const dayExpense = dayRecs.filter(r => r.type === 'expense' && r.category !== 'transfer').reduce((s, r) => s + r.amount, 0);
+      const dayIncome  = dayRecs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+      
+      let dateLabel = U.formatDate(date);
+      const today = U.todayStr();
+      if (date === today) dateLabel = '今天';
+      else { const d = new Date(); d.setDate(d.getDate() - 1); if (U.todayStr(d) === date) dateLabel = '昨天'; }
+      
+      const subtotalParts = [];
+      if (dayExpense) subtotalParts.push(`支 ${fmtFen(dayExpense)}`);
+      if (dayIncome)  subtotalParts.push(`收 ${fmtFen(dayIncome)}`);
+
+      const items = dayRecs.map(r => {
+        const cat = findCat(r.type, r.category); 
+        const acc = findAcc(r.account);
+        const isTransfer = r.category === 'transfer';
+        
+        const sign = r.type === 'income' ? '+' : '-'; 
+        const cls = isTransfer ? 'transfer' : (r.type === 'income' ? 'income' : 'expense');
+        const subs = []; 
+        if (r.time) subs.push(r.time); 
+        if (acc) subs.push(acc.name); 
+        if (r.note) subs.push(r.note);
+
+        return `<div class="ledger-item">
+          <span class="ledger-cat-icon ${isTransfer ? 'transfer' : ''}">${U.escape(cat.icon)}</span>
+          <div class="ledger-item-main">
+            <div class="ledger-item-title">${U.escape(cat.name)}</div>
+            <div class="ledger-item-sub">${U.escape(subs.join(' · '))}</div>
+          </div>
+          <span class="ledger-amount ${cls}">${sign}${fmtFen(r.amount)}</span>
+          <button class="ledger-item-menu" data-act="ledger-edit" data-id="${r.id}">⋯</button>
+        </div>`;
+      }).join('');
+      
+      return `<div class="ledger-day"><div class="ledger-day-head"><span class="ledger-day-label">${dateLabel}</span><span class="ledger-day-sub">${subtotalParts.join(' / ')}</span></div>${items}</div>`;
+    }).join('') + `</div>`;
+  }
+
+  /* ============ 统计页 ============ */
+  function renderStats() {
+    const range = getRangeFor(viewRange, getAnchor());
+    const recs = recordsInRange(range);
+    if (!recs.length) return `<div class="empty" style="padding:36px 16px">本周期暂无数据</div>`;
+    return `${renderCatRank(recs, 'expense', '支出分类')}${renderCatRank(recs, 'income', '收入分类')}`;
+  }
+
+  function renderCatRank(recs, type, title) {
+    const filtered = recs.filter(r => r.type === type && r.category !== 'transfer');
+    if (!filtered.length) return `<div class="rank-card"><div class="rank-title">${title}</div><div class="card-empty" style="padding:6px 0">无记录</div></div>`;
+    const map = {}; filtered.forEach(r => { map[r.category] = (map[r.category] || 0) + r.amount; });
+    const total = Object.values(map).reduce((s, v) => s + v, 0);
+    const list = Object.keys(map).map(cid => ({ cat: findCat(type, cid), amount: map[cid] })).sort((a, b) => b.amount - a.amount);
+    const max = list[0].amount;
+    const rows = list.map(x => {
+      const pct = Math.round(x.amount / total * 100); const width = Math.round(x.amount / max * 100);
+      const barCls = type === 'income' ? 'income' : 'expense';
+      return `<div class="rank-item"><span class="rank-icon">${U.escape(x.cat.icon)}</span><div class="rank-main"><div class="rank-line"><span class="rank-name">${U.escape(x.cat.name)}</span><span class="rank-amount">${fmtFen(x.amount)}</span></div><div class="rank-bar"><i class="${barCls}" style="width:${width}%"></i></div></div><span class="rank-pct">${pct}%</span></div>`;
+    }).join('');
+    const totalCls = type === 'income' ? 'income' : 'expense';
+    return `<div class="rank-card"><div class="rank-title"><span>${title}</span><span class="rank-total ${totalCls}">${fmtFen(total)}</span></div>${rows}</div>`;
+  }
+
+  function renderTrend() {
+    const year = getAnchor().getFullYear(); const data = buildTrendData(year);
+    const totalIncome  = data.reduce((s, d) => s + d.income, 0); const totalExpense = data.reduce((s, d) => s + d.expense, 0);
+    const balance = totalIncome - totalExpense;
+    const head = `<div class="ledger-range-head"><button class="sum-nav" data-act="ledger-prev">‹</button><span class="ledger-range-title">${year}年</span><div class="ledger-range-right"><button class="sum-now" data-act="ledger-now">今年</button><button class="sum-nav" data-act="ledger-next">›</button></div></div>`;
+    const summary = `<div class="ledger-summary"><div class="ls-item"><span class="ls-label">年支出</span><span class="ls-val expense">${fmtFen(totalExpense)}</span></div><div class="ls-item"><span class="ls-label">年收入</span><span class="ls-val income">${fmtFen(totalIncome)}</span></div><div class="ls-item"><span class="ls-label">年结余</span><span class="ls-val ${balance >= 0 ? 'ok' : 'bad'}">${balance >= 0 ? '' : '-'}${fmtFen(Math.abs(balance))}</span></div></div>`;
+    const legend = `<div class="trend-legend"><span><i class="t-dot income"></i>收入</span><span><i class="t-dot expense"></i>支出</span></div>`;
+    return `${head}${summary}<div class="chart-card"><div class="chart-title"><span>月度收支趋势</span><span class="chart-unit">${year}年</span></div>${buildBarChart(data)}${legend}</div>`;
+  }
+
+  /* ============ 账户列表页 ============ */
+  function renderAccounts() {
+    const accounts = getData().accounts;
+    if (!accounts.length) return `<div class="empty" data-emoji="💰">还没有存钱计划<br><button class="btn btn-primary" data-act="acc-add" style="margin-top:12px">+ 新建计划</button></div>`;
+    
+    const active = accounts.filter(a => !a.target || a.amount < a.target || a.isBlindBox);
+    const done   = accounts.filter(a => a.target && a.amount >= a.target && !a.isBlindBox);
+    
+    const tabHeader = `<div class="acc-tabs-header"><span class="acc-tab active">进行中(${active.length})</span><span class="acc-tab-divider">/</span><span class="acc-tab">已结束(${done.length})</span></div>`;
+    
+    let body = active.map(a => renderAccCard(a)).join('');
+    if (done.length) { body += `<div class="acc-done-title">已结束</div>`; body += done.map(a => renderAccCard(a)).join(''); }
+    
+    return `${tabHeader}<div class="acc-list">${body}</div><button class="btn btn-ghost acc-add-btn" data-act="acc-add">+ 新建存钱计划</button>`;
+  }
+
+  function renderAccCard(a) {
+    // 盲盒卡片：不显示小格子，改用进度条
+    if (a.isBlindBox) {
+      const lit = a.litCells || 0;
+      return `<div class="acc-card-image box-card" style="background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);" data-act="acc-action-sheet" data-id="${a.id}">
+        <div class="acc-card-overlay">
+          <div class="acc-card-top">
+            <div class="acc-card-name">🎁 ${U.escape(a.name)}</div>
+            <button class="acc-card-menu" data-act="acc-action-sheet" data-id="${a.id}">⋯</button>
+          </div>
+          
+          <div class="acc-card-middle">
+            <div class="acc-card-target">¥ ${fenToYuan(a.amount)}</div>
+            <div class="acc-card-pct">${lit}%</div>
+          </div>
+          
+          <div class="acc-card-bar">
+            <div class="acc-card-bar-fill" style="width:${lit}%; background:#fff; box-shadow: 0 0 8px rgba(255,255,255,0.8);"></div>
+          </div>
+
+          <div class="acc-card-foot" style="margin-top: 10px;">
+            <span class="acc-card-saved">已点亮 ${lit} / 100 格</span>
+            <span class="acc-card-remain">继续加油！</span>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // 普通卡片
+    const hasTarget = a.target > 0; const pct = hasTarget ? Math.min(100, Math.round(a.amount / a.target * 100 * 100) / 100) : 0;
+    const remain = hasTarget ? Math.max(0, a.target - a.amount) : 0; const isDone = hasTarget && a.amount >= a.target;
+    let bgStyle = '';
+    if (a.image) { bgStyle = `background-image: url('${U.escape(a.image)}');`; }
+    else {
+      const theme = a.theme && a.theme !== 'auto' ? getTheme(a.theme) : null;
+      if (theme && theme.grad) bgStyle = `background-image: ${theme.grad};`;
+      else bgStyle = `background-image: linear-gradient(135deg, #f6d365 0%, #fda085 100%);`;
+    }
+    const timeInfo = computeTimeProgress(a);
+    return `<div class="acc-card-image" style="${bgStyle}" data-act="acc-action-sheet" data-id="${a.id}">
+      <div class="acc-card-overlay">
+        <div class="acc-card-top"><div class="acc-card-name">${U.escape(a.name)}</div><button class="acc-card-menu" data-act="acc-action-sheet" data-id="${a.id}">⋯</button></div>
+        <div class="acc-card-middle"><div class="acc-card-target">${hasTarget ? '¥ ' + fenToYuan(a.target) : '—'}</div><div class="acc-card-pct">${hasTarget ? pct.toFixed(2) + '%' : '0%'}</div></div>
+        <div class="acc-card-bar"><div class="acc-card-bar-fill" style="width:${pct}%"></div></div>
+        ${timeInfo ? `<div class="acc-card-time"><span class="acc-card-time-label">📅 ${timeInfo.rangeText}</span><span class="acc-card-time-pct ${timeInfo.statusCls}">时间已用 ${timeInfo.timePct}%</span></div>` : ''}
+        <div class="acc-card-foot"><span class="acc-card-saved">已攒入：¥ ${fenToYuan(a.amount)}</span><span class="acc-card-remain">${isDone ? '已达成 🎉' : '剩余：¥ ' + fenToYuan(remain)}</span></div>
+      </div>
+    </div>`;
+  }
+
+  function computeTimeProgress(acc) {
+    try {
+      if (!acc || acc.isBlindBox || !acc.startDate || !acc.endDate) return null;
+      const start = parseLocalDate(acc.startDate); const end = parseLocalDate(acc.endDate);
+      if (!start || !end || end <= start) return null;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+      const passedDays = Math.max(0, Math.round((today - start) / 86400000) + 1);
+      const remainDays = Math.max(0, Math.round((end - today) / 86400000));
+      const timePct = Math.min(100, Math.round(passedDays / totalDays * 100));
+      const target = Number(acc.target) || 0; const amount = Number(acc.amount) || 0;
+      const moneyPct = target > 0 ? Math.min(100, Math.round(amount / target * 100)) : 0;
+      let statusCls = 'ok';
+      if (timePct - moneyPct > 15) statusCls = 'behind'; else if (moneyPct - timePct > 15) statusCls = 'ahead';
+      const f = d => (d.getMonth() + 1) + '/' + d.getDate();
+      return { start, end, totalDays, passedDays, remainDays, timePct, moneyPct, statusCls, rangeText: f(start) + ' - ' + f(end) };
+    } catch (e) { return null; }
+  }
+
+  /* ============ 盲盒详情页 ============ */
+  function renderBoxDetail(acc) {
+    const lit = acc.litCells || 0;
+    const records = acc.boxRecords || [];
+
+    let cellsHtml = '';
+    for (let i = 0; i < 100; i++) {
+      const isLit = i < lit;
+      const amount = isLit && records[i] ? (records[i] / 100) : null;
+      cellsHtml += `<div class="box-cell ${isLit ? 'lit' : ''}">
+        ${isLit ? `<span class="box-val">${amount}</span>` : `<span class="box-q">?</span>`}
+      </div>`;
+    }
+
+    return `<div class="module ledger-module acc-detail-page">
+      <div class="acc-detail-head">
+        <button class="acc-detail-back" data-act="acc-detail-back">‹ 返回</button>
+        <div class="acc-detail-title"><span>🎁</span><span class="acc-detail-name">${U.escape(acc.name)}</span></div>
+      </div>
+      
+      <div class="box-hero">
+        <div class="box-hero-label">盲盒总金额</div>
+        <div class="box-hero-val">¥ ${fenToYuan(acc.amount)}</div>
+        <div class="box-hero-progress">已点亮 ${lit} / 100 格</div>
+      </div>
+      
+      <div class="box-grid">${cellsHtml}</div>
+      
+      <button class="btn btn-primary box-open-btn" data-act="acc-open-box" data-id="${acc.id}">🎁 开盲盒存钱</button>
+    </div>`;
+  }
+
+  /* ============ 普通账户详情页 ============ */
+  function renderAccDetail(acc) {
+    const year = accDetail.year; const view = accDetail.view; const curYear = new Date().getFullYear();
+    const txs = (acc.transactions || []).filter(t => (t.date || '').slice(0, 4) === String(year));
+    const monthly = [];
+    for (let m = 1; m <= 12; m++) {
+      const mk = year + '-' + U.pad(m); const monthTxs = txs.filter(t => (t.date || '').slice(0, 7) === mk);
+      const income = monthTxs.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
+      const profit = monthTxs.filter(t => t.type === 'profit').reduce((s, t) => s + t.amount, 0);
+      const outcome = monthTxs.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+      monthly.push({ month: m, label: m + '月', income, profit, outcome, net: income + profit - outcome, count: monthTxs.length });
+    }
+    const totalIn = monthly.reduce((s, m) => s + m.income, 0);
+    const totalProfit = monthly.reduce((s, m) => s + m.profit, 0);
+    const totalOut = monthly.reduce((s, m) => s + m.outcome, 0);
+    const totalNet = totalIn + totalProfit - totalOut;
+
+    const header = `<div class="acc-detail-head"><button class="acc-detail-back" data-act="acc-detail-back">‹ 返回</button><div class="acc-detail-title"><span class="acc-detail-icon">${U.escape(acc.icon || '💼')}</span><span class="acc-detail-name">${U.escape(acc.name)}</span></div></div>`;
+    const balancePct = acc.target > 0 ? Math.min(100, Math.round(acc.amount / acc.target * 100 * 100) / 100) : 0;
+    const balanceCard = `<div class="acc-detail-balance-card"><div class="acc-detail-balance-label">当前余额</div><div class="acc-detail-balance">${fmtFen(acc.amount || 0)}</div>${acc.target > 0 ? `<div class="acc-detail-balance-bar"><i style="width:${Math.min(100, balancePct)}%"></i></div><div class="acc-detail-balance-meta">目标 ${fmtFen(acc.target)} · 已完成 ${balancePct.toFixed(1)}%</div>` : `<div class="acc-detail-balance-meta">未设目标金额</div>`}</div>`;
+
+    const timeInfo = computeTimeProgress(acc);
+    let timeCard = '';
+    if (timeInfo) {
+      const f = d => d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+      const remainAmount = Math.max(0, (acc.target || 0) - (acc.amount || 0));
+      const needPerDay = timeInfo.remainDays > 0 ? remainAmount / timeInfo.remainDays : 0;
+      const gap = timeInfo.moneyPct - timeInfo.timePct;
+      let statusText = '', statusCls = 'ok';
+      if ((acc.amount || 0) >= (acc.target || 0) && acc.target > 0) { statusText = '🎉 已达成目标'; statusCls = 'done'; }
+      else if (timeInfo.remainDays === 0) { statusText = '⏰ 计划已到期'; statusCls = 'over'; }
+      else if (gap >= -5) { statusText = '✅ 进度正常'; statusCls = 'ok'; }
+      else if (gap >= -20) { statusText = '⚠️ 稍落后 ' + Math.abs(gap) + '%'; statusCls = 'warn'; }
+      else { statusText = '❗ 落后 ' + Math.abs(gap) + '%，需要加速'; statusCls = 'over'; }
+      const remainText = remainAmount > 0 ? `<div class="acc-time-suggestion"><div class="ats-title">按计划还需攒</div><div class="ats-grid"><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay))}</span><span class="ats-label">每天</span></div><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay*7))}</span><span class="ats-label">每周</span></div><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay*30))}</span><span class="ats-label">每月</span></div></div></div>` : '';
+      timeCard = `<div class="acc-time-card"><div class="acc-time-title"><span>📅 计划周期</span><span class="acc-time-status ${statusCls}">${statusText}</span></div><div class="acc-time-range">${f(timeInfo.start)} → ${f(timeInfo.end)}</div><div class="acc-time-meta">已过 ${timeInfo.passedDays} 天 / 共 ${timeInfo.totalDays} 天 ${timeInfo.remainDays > 0 ? ' · 还剩 ' + timeInfo.remainDays + ' 天' : ''}</div><div class="acc-time-bar"><i style="width:${timeInfo.timePct}%"></i><span class="acc-time-bar-mark" style="left:${Math.min(100, timeInfo.moneyPct)}%"></span></div><div class="acc-time-bar-labels"><span>时间进度 ${timeInfo.timePct}%</span><span>金额进度 ${timeInfo.moneyPct}%</span></div>${remainText}</div>`;
+    }
+
+    const yearNav = `<div class="acc-detail-year"><button class="sum-nav" data-act="acc-detail-year" data-year="${year - 1}">‹</button><span class="acc-detail-year-title">${year} 年 ${year === curYear ? '<span class="sum-now-tag">今年</span>' : ''}</span><button class="sum-nav" data-act="acc-detail-year" data-year="${year + 1}" ${year >= curYear ? 'disabled' : ''}>›</button></div>`;
+    const viewSwitch = `<div class="tabs acc-detail-tabs"><button class="tab ${view === 'chart' ? 'active' : ''}" data-act="acc-detail-view" data-view="chart">折线图</button><button class="tab ${view === 'cards' ? 'active' : ''}" data-act="acc-detail-view" data-view="cards">月度卡片</button></div>`;
+    const summary = `<div class="acc-detail-summary"><div class="ads-item"><span class="ads-label">全年存入</span><span class="ads-value income">+${fmtFen(totalIn)}</span></div><div class="ads-item"><span class="ads-label">全年收益</span><span class="ads-value profit">+${fmtFen(totalProfit)}</span></div><div class="ads-item"><span class="ads-label">全年取出</span><span class="ads-value outcome">-${fmtFen(totalOut)}</span></div><div class="ads-item full-width"><span class="ads-label">全年净增长</span><span class="ads-value ${totalNet >= 0 ? 'income' : 'outcome'}">${totalNet >= 0 ? '+' : '-'}${fmtFen(Math.abs(totalNet))}</span></div></div>`;
+    
+    let body = view === 'chart' ? renderAccChart(monthly) : renderAccCards(monthly);
+
+    return `<div class="module ledger-module acc-detail-page">${header}${balanceCard}${timeCard}${yearNav}${viewSwitch}${summary}${body}</div>`;
+  }
+
+  function renderAccChart(monthly) {
+    const W = 360, H = 220; const padL = 46, padR = 14, padT = 16, padB = 32; const cw = W - padL - padR; const ch = H - padT - padB;
+    const maxVal = Math.max(1, ...monthly.map(m => Math.max(m.income, m.outcome, m.profit)));
+    const yMax = Math.max(100, Math.ceil(maxVal / 100) * 100); const yScale = v => padT + ((yMax - v) / yMax) * ch; const xScale = i => padL + (i / 11) * cw;
+    let grid = ''; for (let i = 0; i <= 4; i++) { const v = yMax - (yMax / 4) * i; const y = padT + ch * i / 4; grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#e8eef5" stroke-dasharray="3 4"/>`; grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${fmtFen(Math.round(v))}</text>`; }
+    const inPts = monthly.map((m, i) => [xScale(i), yScale(m.income)]); const profitPts = monthly.map((m, i) => [xScale(i), yScale(m.profit)]); const outPts = monthly.map((m, i) => [xScale(i), yScale(m.outcome)]);
+    const inLine = `<polyline points="${inPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#4caf7d" stroke-width="2" stroke-linejoin="round"/>`;
+    const profitLine = `<polyline points="${profitPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f0a020" stroke-width="2" stroke-linejoin="round" stroke-dasharray="4 2"/>`;
+    const outLine = `<polyline points="${outPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#e35d5d" stroke-width="2" stroke-linejoin="round"/>`;
+    let inDots = '', profitDots = '', outDots = '';
+    monthly.forEach((m, i) => { if (m.income > 0) inDots += `<circle cx="${xScale(i)}" cy="${yScale(m.income)}" r="3" fill="#4caf7d" stroke="#fff" stroke-width="1.5"/>`; if (m.profit > 0) profitDots += `<circle cx="${xScale(i)}" cy="${yScale(m.profit)}" r="3" fill="#f0a020" stroke="#fff" stroke-width="1.5"/>`; if (m.outcome > 0) outDots += `<circle cx="${xScale(i)}" cy="${yScale(m.outcome)}" r="3" fill="#e35d5d" stroke="#fff" stroke-width="1.5"/>`; });
+    let xLabels = ''; monthly.forEach((m, i) => { xLabels += `<text x="${xScale(i)}" y="${H - 10}" text-anchor="middle" font-size="9" fill="#a8b3c1">${m.month}月</text>`; });
+    return `<div class="acc-detail-chart"><div class="acc-detail-legend"><span><i class="adl-dot in"></i>存入</span><span><i class="adl-dot profit"></i>收益</span><span><i class="adl-dot out"></i>取出</span></div><svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">${grid}<line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>${inLine}${profitLine}${outLine}${inDots}${profitDots}${outDots}${xLabels}</svg></div>`;
+  }
+
+  function renderAccCards(monthly) {
+    const cards = monthly.map(m => {
+      const hasData = m.income > 0 || m.outcome > 0 || m.profit > 0;
+      return `<div class="acc-month-card ${hasData ? '' : 'empty'}"><div class="acc-month-title">${m.month}月</div>${hasData ? `<div class="acc-month-row"><span class="acc-month-label">存入</span><span class="acc-month-val income">+${fmtFen(m.income)}</span></div><div class="acc-month-row"><span class="acc-month-label">收益</span><span class="acc-month-val profit">+${fmtFen(m.profit)}</span></div><div class="acc-month-row"><span class="acc-month-label">取出</span><span class="acc-month-val outcome">-${fmtFen(m.outcome)}</span></div><div class="acc-month-net ${m.net >= 0 ? 'income' : 'outcome'}">${m.net >= 0 ? '+' : '-'}${fmtFen(Math.abs(m.net))}</div>` : `<div class="acc-month-empty">无记录</div>`}</div>`;
+    }).join('');
+    return `<div class="acc-detail-cards">${cards}</div>`;
+  }
+
+  /* ============ 购物清单 ============ */
   function renderShop() {
     const data = getData();
     const tabs = `
@@ -443,8 +742,6 @@
 
     if (shopTab === 'cooling') {
       const cooling = data.coolingItems.filter(i => i.status === 'cooling');
-      
-      // 计算已省下金额
       let savedMoney = data.coolingItems.filter(i => i.status === 'abandoned').reduce((s, i) => s + i.price, 0);
 
       const cards = cooling.length ? cooling.map(item => {
@@ -486,7 +783,6 @@
       `;
     }
 
-    // 物品档案馆
     const archive = data.archiveItems.sort((a,b) => b.date.localeCompare(a.date));
     const cards = archive.length ? archive.map(item => {
       let statusLabel = '中规中矩', statusCls = 'normal';
@@ -518,7 +814,6 @@
     `;
   }
 
-  /* ============ 购物清单表单 ============ */
   function openCoolingForm() {
     UI.form('添加想买的物品', [
       { name: 'name', label: '物品名称', required: true, placeholder: '例如：机械键盘' },
@@ -600,153 +895,37 @@
     });
   }
 
-  /* ============ 其他渲染（保持原样） ============ */
-  function renderList() {
-    const range = getRangeFor(viewRange, getAnchor());
-    const recs = recordsInRange(range);
-    const expense = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const income  = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const balance = income - expense;
-
-    const rangeSwitcher = `<div class="ledger-range-switch"><button class="${viewRange === 'week' ? 'active' : ''}" data-act="ledger-range" data-range="week">周</button><button class="${viewRange === 'month' ? 'active' : ''}" data-act="ledger-range" data-range="month">月</button><button class="${viewRange === 'year' ? 'active' : ''}" data-act="ledger-range" data-range="year">年</button></div>`;
-    const head = `<div class="ledger-range-head"><button class="sum-nav" data-act="ledger-prev">‹</button><span class="ledger-range-title">${fmtRangeLabel(range)}</span><div class="ledger-range-right"><button class="sum-now" data-act="ledger-now">现在</button><button class="sum-nav" data-act="ledger-next">›</button></div></div>`;
-    const summary = `<div class="ledger-summary"><div class="ls-item"><span class="ls-label">支出</span><span class="ls-val expense">${fmtFen(expense)}</span></div><div class="ls-item"><span class="ls-label">收入</span><span class="ls-val income">${fmtFen(income)}</span></div><div class="ls-item"><span class="ls-label">结余</span><span class="ls-val ${balance >= 0 ? 'ok' : 'bad'}">${balance >= 0 ? '' : '-'}${fmtFen(Math.abs(balance))}</span></div></div>`;
-    const bs = computeBudgetStatus();
-    const budgetBar = bs ? `<div class="ledger-budget"><div class="lb-head"><span class="lb-title">📊 本周期预算</span><span class="lb-pct ${bs.cls}">${bs.pct}%</span></div><div class="lb-bar"><i class="${bs.cls}" style="width:${Math.min(100, bs.pct)}%"></i></div><div class="lb-foot"><span>已花 ${fmtFen(bs.spent)}</span><span class="${bs.cls}">${bs.remain >= 0 ? '剩余 ' + fmtFen(bs.remain) + ' / ' + fmtFen(bs.budget) : '超支 ' + fmtFen(-bs.remain)}</span></div></div>` : '';
-    return `${rangeSwitcher}${head}${summary}${budgetBar}${renderFlowList(recs)}`;
-  }
-
-  function renderFlowList(recs) {
-    if (!recs.length) return `<div class="empty" style="padding:30px 16px">本周期暂无记录<br><button class="btn btn-primary" data-act="ledger-add" style="margin-top:12px">+ 记一笔</button></div>`;
-    const byDate = {};
-    recs.forEach(r => { (byDate[r.date || ''] = byDate[r.date || ''] || []).push(r); });
-    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
-    return `<div class="ledger-list">` + dates.map(date => {
-      const dayRecs = byDate[date].slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      const dayExpense = dayRecs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-      const dayIncome  = dayRecs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-      let dateLabel = U.formatDate(date);
-      const today = U.todayStr();
-      if (date === today) dateLabel = '今天';
-      else { const d = new Date(); d.setDate(d.getDate() - 1); if (U.todayStr(d) === date) dateLabel = '昨天'; }
-      const subtotalParts = [];
-      if (dayExpense) subtotalParts.push(`支 ${fmtFen(dayExpense)}`);
-      if (dayIncome)  subtotalParts.push(`收 ${fmtFen(dayIncome)}`);
-      const items = dayRecs.map(r => {
-        const cat = findCat(r.type, r.category); const acc = findAcc(r.account);
-        const sign = r.type === 'income' ? '+' : '-'; const cls = r.type === 'income' ? 'income' : 'expense';
-        const subs = []; if (r.time) subs.push(r.time); if (acc) subs.push(acc.name); if (r.note) subs.push(r.note);
-        return `<div class="ledger-item"><span class="ledger-cat-icon">${U.escape(cat.icon)}</span><div class="ledger-item-main"><div class="ledger-item-title">${U.escape(cat.name)}</div><div class="ledger-item-sub">${U.escape(subs.join(' · '))}</div></div><span class="ledger-amount ${cls}">${sign}${fmtFen(r.amount)}</span><button class="ledger-item-menu" data-act="ledger-edit" data-id="${r.id}">⋯</button></div>`;
-      }).join('');
-      return `<div class="ledger-day"><div class="ledger-day-head"><span class="ledger-day-label">${dateLabel}</span><span class="ledger-day-sub">${subtotalParts.join(' / ')}</span></div>${items}</div>`;
-    }).join('') + `</div>`;
-  }
-
-  function renderStats() {
-    const range = getRangeFor(viewRange, getAnchor());
-    const recs = recordsInRange(range);
-    if (!recs.length) return `<div class="empty" style="padding:36px 16px">本周期暂无数据</div>`;
-    return `${renderCatRank(recs, 'expense', '支出分类')}${renderCatRank(recs, 'income', '收入分类')}`;
-  }
-
-  function renderCatRank(recs, type, title) {
-    const filtered = recs.filter(r => r.type === type);
-    if (!filtered.length) return `<div class="rank-card"><div class="rank-title">${title}</div><div class="card-empty" style="padding:6px 0">无记录</div></div>`;
-    const map = {}; filtered.forEach(r => { map[r.category] = (map[r.category] || 0) + r.amount; });
-    const total = Object.values(map).reduce((s, v) => s + v, 0);
-    const list = Object.keys(map).map(cid => ({ cat: findCat(type, cid), amount: map[cid] })).sort((a, b) => b.amount - a.amount);
-    const max = list[0].amount;
-    const rows = list.map(x => {
-      const pct = Math.round(x.amount / total * 100); const width = Math.round(x.amount / max * 100);
-      const barCls = type === 'income' ? 'income' : 'expense';
-      return `<div class="rank-item"><span class="rank-icon">${U.escape(x.cat.icon)}</span><div class="rank-main"><div class="rank-line"><span class="rank-name">${U.escape(x.cat.name)}</span><span class="rank-amount">${fmtFen(x.amount)}</span></div><div class="rank-bar"><i class="${barCls}" style="width:${width}%"></i></div></div><span class="rank-pct">${pct}%</span></div>`;
-    }).join('');
-    const totalCls = type === 'income' ? 'income' : 'expense';
-    return `<div class="rank-card"><div class="rank-title"><span>${title}</span><span class="rank-total ${totalCls}">${fmtFen(total)}</span></div>${rows}</div>`;
-  }
-
-  function renderTrend() {
-    const year = getAnchor().getFullYear(); const data = buildTrendData(year);
-    const totalIncome  = data.reduce((s, d) => s + d.income, 0); const totalExpense = data.reduce((s, d) => s + d.expense, 0);
-    const balance = totalIncome - totalExpense;
-    const head = `<div class="ledger-range-head"><button class="sum-nav" data-act="ledger-prev">‹</button><span class="ledger-range-title">${year}年</span><div class="ledger-range-right"><button class="sum-now" data-act="ledger-now">今年</button><button class="sum-nav" data-act="ledger-next">›</button></div></div>`;
-    const summary = `<div class="ledger-summary"><div class="ls-item"><span class="ls-label">年支出</span><span class="ls-val expense">${fmtFen(totalExpense)}</span></div><div class="ls-item"><span class="ls-label">年收入</span><span class="ls-val income">${fmtFen(totalIncome)}</span></div><div class="ls-item"><span class="ls-label">年结余</span><span class="ls-val ${balance >= 0 ? 'ok' : 'bad'}">${balance >= 0 ? '' : '-'}${fmtFen(Math.abs(balance))}</span></div></div>`;
-    const legend = `<div class="trend-legend"><span><i class="t-dot income"></i>收入</span><span><i class="t-dot expense"></i>支出</span></div>`;
-    return `${head}${summary}<div class="chart-card"><div class="chart-title"><span>月度收支趋势</span><span class="chart-unit">${year}年</span></div>${buildBarChart(data)}${legend}</div>`;
-  }
-
-  function renderAccounts() {
-    const accounts = getData().accounts;
-    if (!accounts.length) return `<div class="empty" data-emoji="💰">还没有存钱计划<br><button class="btn btn-primary" data-act="acc-add" style="margin-top:12px">+ 新建计划</button></div>`;
-    const active = accounts.filter(a => !a.target || a.amount < a.target);
-    const done   = accounts.filter(a => a.target && a.amount >= a.target);
-    const tabHeader = `<div class="acc-tabs-header"><span class="acc-tab active">进行中(${active.length})</span><span class="acc-tab-divider">/</span><span class="acc-tab">已结束(${done.length})</span></div>`;
-    let body = active.map(a => renderAccCard(a)).join('');
-    if (done.length) { body += `<div class="acc-done-title">已结束</div>`; body += done.map(a => renderAccCard(a)).join(''); }
-    return `${tabHeader}<div class="acc-list">${body}</div><button class="btn btn-ghost acc-add-btn" data-act="acc-add">+ 新建存钱计划</button>`;
-  }
-
-  function renderAccCard(a) {
-    const hasTarget = a.target > 0; const pct = hasTarget ? Math.min(100, Math.round(a.amount / a.target * 100 * 100) / 100) : 0;
-    const remain = hasTarget ? Math.max(0, a.target - a.amount) : 0; const isDone = hasTarget && a.amount >= a.target;
-    let bgStyle = '';
-    if (a.image) { bgStyle = `background-image: url('${U.escape(a.image)}');`; }
-    else {
-      const theme = a.theme && a.theme !== 'auto' ? getTheme(a.theme) : null;
-      if (theme && theme.grad) bgStyle = `background-image: ${theme.grad};`;
-      else bgStyle = `background-image: linear-gradient(135deg, #f6d365 0%, #fda085 100%);`;
-    }
-    const timeInfo = computeTimeProgress(a);
-    return `<div class="acc-card-image" style="${bgStyle}" data-act="acc-action-sheet" data-id="${a.id}">
-      <div class="acc-card-overlay">
-        <div class="acc-card-top"><div class="acc-card-name">${U.escape(a.name)}</div><button class="acc-card-menu" data-act="acc-action-sheet" data-id="${a.id}">⋯</button></div>
-        <div class="acc-card-middle"><div class="acc-card-target">${hasTarget ? '¥ ' + fenToYuan(a.target) : '—'}</div><div class="acc-card-pct">${hasTarget ? pct.toFixed(2) + '%' : '0%'}</div></div>
-        <div class="acc-card-bar"><div class="acc-card-bar-fill" style="width:${pct}%"></div></div>
-        ${timeInfo ? `<div class="acc-card-time"><span class="acc-card-time-label">📅 ${timeInfo.rangeText}</span><span class="acc-card-time-pct ${timeInfo.statusCls}">时间已用 ${timeInfo.timePct}%</span></div>` : ''}
-        <div class="acc-card-foot"><span class="acc-card-saved">已攒入：¥ ${fenToYuan(a.amount)}</span><span class="acc-card-remain">${isDone ? '已达成 🎉' : '剩余：¥ ' + fenToYuan(remain)}</span></div>
-      </div>
-    </div>`;
-  }
-
-  function computeTimeProgress(acc) {
-    try {
-      if (!acc || !acc.startDate || !acc.endDate) return null;
-      const start = parseLocalDate(acc.startDate); const end = parseLocalDate(acc.endDate);
-      if (!start || !end || end <= start) return null;
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
-      const passedDays = Math.max(0, Math.round((today - start) / 86400000) + 1);
-      const remainDays = Math.max(0, Math.round((end - today) / 86400000));
-      const timePct = Math.min(100, Math.round(passedDays / totalDays * 100));
-      const target = Number(acc.target) || 0; const amount = Number(acc.amount) || 0;
-      const moneyPct = target > 0 ? Math.min(100, Math.round(amount / target * 100)) : 0;
-      let statusCls = 'ok';
-      if (timePct - moneyPct > 15) statusCls = 'behind'; else if (moneyPct - timePct > 15) statusCls = 'ahead';
-      const f = d => (d.getMonth() + 1) + '/' + d.getDate();
-      return { start, end, totalDays, passedDays, remainDays, timePct, moneyPct, statusCls, rangeText: f(start) + ' - ' + f(end) };
-    } catch (e) { return null; }
-  }
-
-  /* ============ 账户操作 ============ */
+  /* ============ 账户操作及菜单 ============ */
   function doAccAdd() {
     const themeOptions = ACC_THEMES.map(t => ({ value: t.id, label: t.name }));
     UI.form('新建存钱计划', [
-      { name: 'name', label: '计划名称', required: true },
-      { name: 'target', label: '目标金额', type: 'number', value: '', required: true },
-      { name: 'amount', label: '已攒入金额', type: 'number', value: 0, required: true },
+      { name: 'type', label: '账户类型', type: 'select', value: 'normal', options: [
+        { value: 'normal', label: '普通攒钱计划' },
+        { value: 'blindbox', label: '盲盒挑战（100格）' }
+      ]},
+      { name: 'name', label: '计划名称', required: true, placeholder: '例如：旅行基金 / 盲盒抽奖' },
       { name: 'startDate', label: '开始日期（可留空）', type: 'date', value: '' },
-      { name: 'endDate',   label: '结束日期（可留空）', type: 'date', value: '' },
+      { name: 'target', label: '目标金额（盲盒无需填）', type: 'number', value: '' },
+      { name: 'endDate', label: '结束日期（盲盒无需填）', type: 'date', value: '' },
       { name: 'theme', label: '背景色方案', type: 'select', value: 'auto', options: themeOptions },
       { name: 'image',  label: '背景图片链接（可留空）', value: '' }
     ]).then(r => {
       if (!r) return;
-      const amtFen = yuanToFen(r.amount) || 0; const tgtFen = yuanToFen(r.target) || 0;
+      const isBox = r.type === 'blindbox';
+      const amtFen = 0; 
+      const tgtFen = isBox ? 10000 : (yuanToFen(r.target) || 0);
+      
       Store.update(KEY, d => {
         d.accounts.push({
-          id: U.uid('a'), name: r.name, target: tgtFen, amount: amtFen,
-          startDate: r.startDate || null, endDate: r.endDate || null,
+          id: U.uid('a'), name: r.name, 
+          target: tgtFen, amount: amtFen,
+          isBlindBox: isBox,
+          litCells: 0,
+          boxRecords: [],
+          startDate: r.startDate || null, 
+          endDate: isBox ? null : (r.endDate || null),
           theme: r.theme || 'auto', image: r.image || '',
-          transactions: amtFen > 0 ? [{ id: U.uid('tx'), type: 'in', amount: amtFen, note: '初始金额', date: r.startDate || U.todayStr(), createdAt: Date.now() }] : [],
+          transactions: [],
           createdAt: Date.now()
         });
         return d;
@@ -756,6 +935,8 @@
 
   function doAccAddMoney(id) {
     const acc = getData().accounts.find(a => a.id === id); if (!acc) return;
+    if (acc.isBlindBox) { UI.toast('请点击"开盲盒"按钮'); return; }
+    
     UI.form('存入「' + acc.name + '」', [
       { name: 'amt', label: '存入金额', type: 'number', value: '', required: true },
       { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
@@ -794,31 +975,18 @@
 
   function doAccAddProfit(id) {
     const acc = getData().accounts.find(a => a.id === id); if (!acc) return;
-    
-    // 找出所有收益记录并倒序排，拿最近的一条
-    const profits = (acc.transactions || [])
-      .filter(t => t.type === 'profit')
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    
+    const profits = (acc.transactions || []).filter(t => t.type === 'profit').sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     let infoText = '这是第一次记录收益，加油！';
     if (profits.length > 0) {
-      const lastDate = profits[0].date;
-      const today = U.todayStr();
-      const d1 = parseLocalDate(lastDate);
-      const d2 = parseLocalDate(today);
-      const diffDays = Math.round((d2 - d1) / 86400000);
-      
-      if (diffDays === 0) {
-        infoText = `📅 <b>今天已经记过了</b>（${lastDate}）。如果是新增其他收益，请继续填写。`;
-      } else if (diffDays === 1) {
-        infoText = `📅 上次记收益是 <b>昨天</b>（${lastDate}）。`;
-      } else if (diffDays > 1) {
-        infoText = `📅 上次记收益是 <b>${lastDate}</b>（已隔 ${diffDays} 天）。<br>如果要补记前几天的收益，请在下方修改日期。`;
-      }
+      const lastDate = profits[0].date; const today = U.todayStr();
+      const diffDays = Math.round((parseLocalDate(today) - parseLocalDate(lastDate)) / 86400000);
+      if (diffDays === 0) infoText = `📅 <b>今天已经记过了</b>（${lastDate}）。`;
+      else if (diffDays === 1) infoText = `📅 上次记收益是 <b>昨天</b>（${lastDate}）。`;
+      else if (diffDays > 1) infoText = `📅 上次记收益是 <b>${lastDate}</b>（已隔 ${diffDays} 天）。`;
     }
 
     UI.form('记录「' + acc.name + '」收益', [
-      { type: 'info', label: infoText }, // 👈 插入提示
+      { type: 'info', label: infoText },
       { name: 'amt', label: '本次收益金额（元）', type: 'number', value: '', required: true, placeholder: '例如：0.71' },
       { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
       { name: 'note', label: '备注（可选）', value: '基金收益' }
@@ -839,22 +1007,33 @@
     const acc = getData().accounts.find(a => a.id === id); if (!acc) return;
     const oldAmount = acc.amount || 0;
     const themeOptions = ACC_THEMES.map(t => ({ value: t.id, label: t.name }));
-    UI.form('编辑计划', [
-      { name: 'name', label: '计划名称', required: true, value: acc.name },
-      { name: 'target', label: '目标金额', type: 'number', value: fenToYuan(acc.target || 0), required: true },
-      { name: 'amount', label: '当前余额', type: 'number', value: fenToYuan(acc.amount), required: true },
-      { name: 'startDate', label: '开始日期（可留空）', type: 'date', value: acc.startDate || '' },
-      { name: 'endDate',   label: '结束日期（可留空）', type: 'date', value: acc.endDate || '' },
-      { name: 'theme', label: '背景色方案', type: 'select', value: acc.theme || 'auto', options: themeOptions },
-      { name: 'image',  label: '背景图片链接（可留空）', value: acc.image || '' }
-    ]).then(r => {
+    
+    const fields = [
+      { name: 'name', label: '计划名称', required: true, value: acc.name }
+    ];
+    if (!acc.isBlindBox) {
+      fields.push({ name: 'target', label: '目标金额', type: 'number', value: fenToYuan(acc.target || 0), required: true });
+      fields.push({ name: 'endDate', label: '结束日期（可留空）', type: 'date', value: acc.endDate || '' });
+    }
+    fields.push({ name: 'amount', label: '当前余额', type: 'number', value: fenToYuan(acc.amount), required: true });
+    fields.push({ name: 'startDate', label: '开始日期（可留空）', type: 'date', value: acc.startDate || '' });
+    fields.push({ name: 'theme', label: '背景色方案', type: 'select', value: acc.theme || 'auto', options: themeOptions });
+    fields.push({ name: 'image',  label: '背景图片链接（可留空）', value: acc.image || '' });
+
+    UI.form('编辑计划', fields).then(r => {
       if (!r) return;
-      const amtFen = yuanToFen(r.amount) || 0; const tgtFen = yuanToFen(r.target) || 0; const diff = amtFen - oldAmount;
+      const amtFen = yuanToFen(r.amount) || 0; 
+      const tgtFen = acc.isBlindBox ? acc.target : (yuanToFen(r.target) || 0); 
+      const diff = amtFen - oldAmount;
+      
       Store.update(KEY, d => {
         const t = d.accounts.find(x => x.id === id); if (!t) return d;
-        t.name = r.name; t.target = tgtFen; t.amount = amtFen;
-        t.startDate = r.startDate || null; t.endDate = r.endDate || null;
+        t.name = r.name; 
+        if (!t.isBlindBox) { t.target = tgtFen; t.endDate = r.endDate || null; }
+        t.amount = amtFen;
+        t.startDate = r.startDate || null; 
         t.theme = r.theme || 'auto'; t.image = r.image || '';
+        
         if (diff !== 0) {
           if (!t.transactions) t.transactions = [];
           t.transactions.push({ id: U.uid('tx'), type: diff > 0 ? 'in' : 'out', amount: Math.abs(diff), note: '手动调整', date: U.todayStr(), createdAt: Date.now() });
@@ -876,32 +1055,38 @@
   function openAccActionSheet(id) {
     const acc = getData().accounts.find(a => a.id === id); if (!acc) return;
     const old = document.getElementById('accSheet'); if (old) old.remove();
+    
+    let btnsHtml = '';
+    if (acc.isBlindBox) {
+      btnsHtml = `
+        <button class="acc-sheet-btn primary" data-acc-act="openbox" style="grid-column: 1 / -1; background:linear-gradient(135deg, #fbc2eb, #a6c1ee); color:#fff;">
+          <span class="acc-sheet-icon">🎁</span>开盲盒存钱
+        </button>
+        <button class="acc-sheet-btn" data-acc-act="edit"><span class="acc-sheet-icon">✏️</span>编辑</button>
+        <button class="acc-sheet-btn danger" data-acc-act="del"><span class="acc-sheet-icon">🗑️</span>删除</button>
+      `;
+    } else {
+      btnsHtml = `
+        <button class="acc-sheet-btn primary" data-acc-act="add"><span class="acc-sheet-icon">📥</span>存入</button>
+        <button class="acc-sheet-btn" data-acc-act="sub"><span class="acc-sheet-icon">📤</span>取出</button>
+        <button class="acc-sheet-btn" data-acc-act="profit" style="background:#e8f5e9; color:#2e7d32;"><span class="acc-sheet-icon">📈</span>记收益</button>
+        <button class="acc-sheet-btn" data-acc-act="edit"><span class="acc-sheet-icon">✏️</span>编辑</button>
+      `;
+    }
+
     const mask = document.createElement('div'); mask.id = 'accSheet'; mask.className = 'acc-sheet-mask';
     mask.innerHTML = `
       <div class="acc-sheet">
-        <div class="acc-sheet-handle"></div><div class="acc-sheet-title">${U.escape(acc.name)}</div>
+        <div class="acc-sheet-handle"></div>
+        <div class="acc-sheet-title">${U.escape(acc.name)}</div>
         <div class="acc-sheet-btns">
-          <button class="acc-sheet-btn primary" data-acc-act="add"><span class="acc-sheet-icon">📥</span>存入</button>
-          <button class="acc-sheet-btn" data-acc-act="sub"><span class="acc-sheet-icon">📤</span>取出</button>
-          <button class="acc-sheet-btn" data-acc-act="profit" style="background:#e8f5e9; color:#2e7d32; flex-direction:column; gap:4px; padding:10px;">
-  <div style="display:flex; align-items:center; gap:6px;"><span class="acc-sheet-icon">📈</span>记收益</div>
-  <div style="font-size:10px; opacity:.7; font-weight:normal;">
-    ${(() => {
-      const profits = (acc.transactions || []).filter(t => t.type === 'profit').sort((a,b) => (b.date||'').localeCompare(a.date||''));
-      if (!profits.length) return '尚未记录';
-      const diff = Math.round((parseLocalDate(U.todayStr()) - parseLocalDate(profits[0].date)) / 86400000);
-      if (diff === 0) return '今天已记';
-      if (diff === 1) return '上次: 昨天';
-      return `上次: ${profits[0].date.slice(5)} (隔${diff}天)`;
-    })()}
-  </div>
-</button>
-          <button class="acc-sheet-btn" data-acc-act="edit"><span class="acc-sheet-icon">✏️</span>编辑</button>
+          ${btnsHtml}
         </div>
         <button class="acc-sheet-btn acc-sheet-detail" data-acc-act="detail"><span class="acc-sheet-icon">📊</span>查看详情</button>
-        <button class="acc-sheet-btn danger" data-acc-act="del" style="margin-top:8px;"><span class="acc-sheet-icon">🗑️</span>删除</button>
+        ${acc.isBlindBox ? '' : `<button class="acc-sheet-btn danger" data-acc-act="del" style="margin-top:8px;"><span class="acc-sheet-icon">🗑️</span>删除</button>`}
         <button class="acc-sheet-cancel" data-acc-act="cancel">取消</button>
       </div>`;
+      
     document.body.appendChild(mask);
     requestAnimationFrame(() => mask.classList.add('show'));
     mask.addEventListener('click', e => {
@@ -914,6 +1099,10 @@
         else if (act === 'profit') doAccAddProfit(id);
         else if (act === 'edit') doAccEdit(id);
         else if (act === 'del')  doAccDel(id);
+        else if (act === 'openbox') { 
+          const fakeEl = { dataset: { id: id } };
+          Registry.get('ledger').handleAction('acc-open-box', fakeEl, { refresh: () => { if (window.App) App.render(); } });
+        }
         else if (act === 'detail') { accDetail = { id, year: new Date().getFullYear(), view: 'chart' }; if (window.App && App.render) App.render(); }
       }, 220);
     });
@@ -936,76 +1125,7 @@
     });
   }
 
-  /* ============ 详情页与记账面板（原样保留） ============ */
-  function renderAccDetail(acc) {
-    const year = accDetail.year; const view = accDetail.view; const curYear = new Date().getFullYear();
-    const txs = (acc.transactions || []).filter(t => (t.date || '').slice(0, 4) === String(year));
-    const monthly = [];
-    for (let m = 1; m <= 12; m++) {
-      const mk = year + '-' + U.pad(m); const monthTxs = txs.filter(t => (t.date || '').slice(0, 7) === mk);
-      const income = monthTxs.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
-      const profit = monthTxs.filter(t => t.type === 'profit').reduce((s, t) => s + t.amount, 0);
-      const outcome = monthTxs.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
-      monthly.push({ month: m, label: m + '月', income, profit, outcome, net: income + profit - outcome, count: monthTxs.length });
-    }
-    const totalIn = monthly.reduce((s, m) => s + m.income, 0);
-    const totalProfit = monthly.reduce((s, m) => s + m.profit, 0);
-    const totalOut = monthly.reduce((s, m) => s + m.outcome, 0);
-    const totalNet = totalIn + totalProfit - totalOut;
-
-    const header = `<div class="acc-detail-head"><button class="acc-detail-back" data-act="acc-detail-back">‹ 返回</button><div class="acc-detail-title"><span class="acc-detail-icon">${U.escape(acc.icon || '💼')}</span><span class="acc-detail-name">${U.escape(acc.name)}</span></div></div>`;
-    const balancePct = acc.target > 0 ? Math.min(100, Math.round(acc.amount / acc.target * 100 * 100) / 100) : 0;
-    const balanceCard = `<div class="acc-detail-balance-card"><div class="acc-detail-balance-label">当前余额</div><div class="acc-detail-balance">${fmtFen(acc.amount || 0)}</div>${acc.target > 0 ? `<div class="acc-detail-balance-bar"><i style="width:${Math.min(100, balancePct)}%"></i></div><div class="acc-detail-balance-meta">目标 ${fmtFen(acc.target)} · 已完成 ${balancePct.toFixed(1)}%</div>` : `<div class="acc-detail-balance-meta">未设目标金额</div>`}</div>`;
-
-    const timeInfo = computeTimeProgress(acc);
-    let timeCard = '';
-    if (timeInfo) {
-      const f = d => d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
-      const remainAmount = Math.max(0, (acc.target || 0) - (acc.amount || 0));
-      const needPerDay = timeInfo.remainDays > 0 ? remainAmount / timeInfo.remainDays : 0;
-      const gap = timeInfo.moneyPct - timeInfo.timePct;
-      let statusText = '', statusCls = 'ok';
-      if ((acc.amount || 0) >= (acc.target || 0) && acc.target > 0) { statusText = '🎉 已达成目标'; statusCls = 'done'; }
-      else if (timeInfo.remainDays === 0) { statusText = '⏰ 计划已到期'; statusCls = 'over'; }
-      else if (gap >= -5) { statusText = '✅ 进度正常'; statusCls = 'ok'; }
-      else if (gap >= -20) { statusText = '⚠️ 稍落后 ' + Math.abs(gap) + '%'; statusCls = 'warn'; }
-      else { statusText = '❗ 落后 ' + Math.abs(gap) + '%，需要加速'; statusCls = 'over'; }
-      const remainText = remainAmount > 0 ? `<div class="acc-time-suggestion"><div class="ats-title">按计划还需攒</div><div class="ats-grid"><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay))}</span><span class="ats-label">每天</span></div><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay*7))}</span><span class="ats-label">每周</span></div><div class="ats-item"><span class="ats-num">${fmtFen(Math.ceil(needPerDay*30))}</span><span class="ats-label">每月</span></div></div></div>` : '';
-      timeCard = `<div class="acc-time-card"><div class="acc-time-title"><span>📅 计划周期</span><span class="acc-time-status ${statusCls}">${statusText}</span></div><div class="acc-time-range">${f(timeInfo.start)} → ${f(timeInfo.end)}</div><div class="acc-time-meta">已过 ${timeInfo.passedDays} 天 / 共 ${timeInfo.totalDays} 天 ${timeInfo.remainDays > 0 ? ' · 还剩 ' + timeInfo.remainDays + ' 天' : ''}</div><div class="acc-time-bar"><i style="width:${timeInfo.timePct}%"></i><span class="acc-time-bar-mark" style="left:${Math.min(100, timeInfo.moneyPct)}%"></span></div><div class="acc-time-bar-labels"><span>时间进度 ${timeInfo.timePct}%</span><span>金额进度 ${timeInfo.moneyPct}%</span></div>${remainText}</div>`;
-    }
-
-    const yearNav = `<div class="acc-detail-year"><button class="sum-nav" data-act="acc-detail-year" data-year="${year - 1}">‹</button><span class="acc-detail-year-title">${year} 年 ${year === curYear ? '<span class="sum-now-tag">今年</span>' : ''}</span><button class="sum-nav" data-act="acc-detail-year" data-year="${year + 1}" ${year >= curYear ? 'disabled' : ''}>›</button></div>`;
-    const viewSwitch = `<div class="tabs acc-detail-tabs"><button class="tab ${view === 'chart' ? 'active' : ''}" data-act="acc-detail-view" data-view="chart">折线图</button><button class="tab ${view === 'cards' ? 'active' : ''}" data-act="acc-detail-view" data-view="cards">月度卡片</button></div>`;
-    const summary = `<div class="acc-detail-summary"><div class="ads-item"><span class="ads-label">全年存入</span><span class="ads-value income">+${fmtFen(totalIn)}</span></div><div class="ads-item"><span class="ads-label">全年收益</span><span class="ads-value profit">+${fmtFen(totalProfit)}</span></div><div class="ads-item"><span class="ads-label">全年取出</span><span class="ads-value outcome">-${fmtFen(totalOut)}</span></div><div class="ads-item full-width"><span class="ads-label">全年净增长</span><span class="ads-value ${totalNet >= 0 ? 'income' : 'outcome'}">${totalNet >= 0 ? '+' : '-'}${fmtFen(Math.abs(totalNet))}</span></div></div>`;
-    
-    let body = view === 'chart' ? renderAccChart(monthly) : renderAccCards(monthly);
-
-    return `<div class="module ledger-module acc-detail-page">${header}${balanceCard}${timeCard}${yearNav}${viewSwitch}${summary}${body}</div>`;
-  }
-
-  function renderAccChart(monthly) {
-    const W = 360, H = 220; const padL = 46, padR = 14, padT = 16, padB = 32; const cw = W - padL - padR; const ch = H - padT - padB;
-    const maxVal = Math.max(1, ...monthly.map(m => Math.max(m.income, m.outcome, m.profit)));
-    const yMax = Math.max(100, Math.ceil(maxVal / 100) * 100); const yScale = v => padT + ((yMax - v) / yMax) * ch; const xScale = i => padL + (i / 11) * cw;
-    let grid = ''; for (let i = 0; i <= 4; i++) { const v = yMax - (yMax / 4) * i; const y = padT + ch * i / 4; grid += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#e8eef5" stroke-dasharray="3 4"/>`; grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${fmtFen(Math.round(v))}</text>`; }
-    const inPts = monthly.map((m, i) => [xScale(i), yScale(m.income)]); const profitPts = monthly.map((m, i) => [xScale(i), yScale(m.profit)]); const outPts = monthly.map((m, i) => [xScale(i), yScale(m.outcome)]);
-    const inLine = `<polyline points="${inPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#4caf7d" stroke-width="2" stroke-linejoin="round"/>`;
-    const profitLine = `<polyline points="${profitPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#f0a020" stroke-width="2" stroke-linejoin="round" stroke-dasharray="4 2"/>`;
-    const outLine = `<polyline points="${outPts.map(p => p.join(',')).join(' ')}" fill="none" stroke="#e35d5d" stroke-width="2" stroke-linejoin="round"/>`;
-    let inDots = '', profitDots = '', outDots = '';
-    monthly.forEach((m, i) => { if (m.income > 0) inDots += `<circle cx="${xScale(i)}" cy="${yScale(m.income)}" r="3" fill="#4caf7d" stroke="#fff" stroke-width="1.5"/>`; if (m.profit > 0) profitDots += `<circle cx="${xScale(i)}" cy="${yScale(m.profit)}" r="3" fill="#f0a020" stroke="#fff" stroke-width="1.5"/>`; if (m.outcome > 0) outDots += `<circle cx="${xScale(i)}" cy="${yScale(m.outcome)}" r="3" fill="#e35d5d" stroke="#fff" stroke-width="1.5"/>`; });
-    let xLabels = ''; monthly.forEach((m, i) => { xLabels += `<text x="${xScale(i)}" y="${H - 10}" text-anchor="middle" font-size="9" fill="#a8b3c1">${m.month}月</text>`; });
-    return `<div class="acc-detail-chart"><div class="acc-detail-legend"><span><i class="adl-dot in"></i>存入</span><span><i class="adl-dot profit"></i>收益</span><span><i class="adl-dot out"></i>取出</span></div><svg viewBox="0 0 ${W} ${H}" class="chart" preserveAspectRatio="xMidYMid meet">${grid}<line x1="${padL}" y1="${padT + ch}" x2="${W - padR}" y2="${padT + ch}" stroke="#d8dce1" stroke-width="1"/>${inLine}${profitLine}${outLine}${inDots}${profitDots}${outDots}${xLabels}</svg></div>`;
-  }
-
-  function renderAccCards(monthly) {
-    const cards = monthly.map(m => {
-      const hasData = m.income > 0 || m.outcome > 0 || m.profit > 0;
-      return `<div class="acc-month-card ${hasData ? '' : 'empty'}"><div class="acc-month-title">${m.month}月</div>${hasData ? `<div class="acc-month-row"><span class="acc-month-label">存入</span><span class="acc-month-val income">+${fmtFen(m.income)}</span></div><div class="acc-month-row"><span class="acc-month-label">收益</span><span class="acc-month-val profit">+${fmtFen(m.profit)}</span></div><div class="acc-month-row"><span class="acc-month-label">取出</span><span class="acc-month-val outcome">-${fmtFen(m.outcome)}</span></div><div class="acc-month-net ${m.net >= 0 ? 'income' : 'outcome'}">${m.net >= 0 ? '+' : '-'}${fmtFen(Math.abs(m.net))}</div>` : `<div class="acc-month-empty">无记录</div>`}</div>`;
-    }).join('');
-    return `<div class="acc-detail-cards">${cards}</div>`;
-  }
-
+  /* ============ 记账面板 ============ */
   function openSheet(editingRec) {
     if (sheetState) return;
     const data = getData();

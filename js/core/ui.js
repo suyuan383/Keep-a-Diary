@@ -23,7 +23,7 @@
         mask.innerHTML = `
           <div class="modal-box">
             <div class="modal-title">${U.escape(title || '确认')}</div>
-            <div class="modal-body">${U.escape(msg)}</div>
+            <div class="modal-body" style="white-space:pre-wrap">${U.escape(msg)}</div>
             <div class="modal-foot">
               <button class="btn btn-ghost" data-r="0">取消</button>
               <button class="btn btn-primary" data-r="1">确定</button>
@@ -47,8 +47,8 @@
         const mask = document.createElement('div');
         mask.className = 'modal-mask';
 
-              const body = fields.map(f => {
-          // 👇 新增：纯文本提示块
+        const body = fields.map(f => {
+          // 纯文本提示块
           if (f.type === 'info') {
             return `<div class="field-info">${f.label}</div>`;
           }
@@ -92,7 +92,9 @@
           const result = {};
           let ok = true;
           fields.forEach(f => {
+            if (f.type === 'info') return;
             const el = mask.querySelector(`[name="${f.name}"]`);
+            if (!el) return;
             let v = el.value;
             if (f.type === 'number') v = v === '' ? '' : Number(v);
             if (f.required && (v === '' || v == null)) ok = false;
