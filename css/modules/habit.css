@@ -1116,3 +1116,11 @@
   gap: 8px;
 }
 .reward-pending-actions .btn { flex: 1; }
+/* 限制型习惯：超限时红色警示 */
+.habit-row.over-limit .habit-name { color: var(--danger); font-weight: 700; }
+.habit-row.over-limit .habit-count { color: var(--danger); }
+.habit-item.over-limit { background: #fdf2f2; border: 1px solid #f8d7da; }
+.habit-item.over-limit .habit-item-name { color: var(--danger); }
+.habit-progress.limit > i { background: var(--warn); }
+.habit-plus.limit { background: #fef4e0; color: #b8760a; }
+.tag-limit { background: #fdecec; color: #b02a2a; }
