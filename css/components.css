@@ -641,3 +641,14 @@ body {
 .tov-weight   .tov-dot { background: #3f7fb8; }
 .tov-event    .tov-dot { background: #785fa3; }
 .tov-wishlist .tov-dot { background: #b96c89; }
+/* 表单内的信息提示块 */
+.field-info {
+  font-size: 12.5px;
+  color: var(--text-2);
+  background: var(--bg-soft);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  line-height: 1.6;
+  border-left: 3px solid var(--primary);
+}

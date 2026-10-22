@@ -47,7 +47,12 @@
         const mask = document.createElement('div');
         mask.className = 'modal-mask';
 
-        const body = fields.map(f => {
+              const body = fields.map(f => {
+          // 👇 新增：纯文本提示块
+          if (f.type === 'info') {
+            return `<div class="field-info">${f.label}</div>`;
+          }
+
           const val = f.value == null ? '' : f.value;
           let input;
           if (f.type === 'select') {

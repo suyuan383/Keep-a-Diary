@@ -794,7 +794,31 @@
 
   function doAccAddProfit(id) {
     const acc = getData().accounts.find(a => a.id === id); if (!acc) return;
+    
+    // 找出所有收益记录并倒序排，拿最近的一条
+    const profits = (acc.transactions || [])
+      .filter(t => t.type === 'profit')
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    
+    let infoText = '这是第一次记录收益，加油！';
+    if (profits.length > 0) {
+      const lastDate = profits[0].date;
+      const today = U.todayStr();
+      const d1 = parseLocalDate(lastDate);
+      const d2 = parseLocalDate(today);
+      const diffDays = Math.round((d2 - d1) / 86400000);
+      
+      if (diffDays === 0) {
+        infoText = `📅 <b>今天已经记过了</b>（${lastDate}）。如果是新增其他收益，请继续填写。`;
+      } else if (diffDays === 1) {
+        infoText = `📅 上次记收益是 <b>昨天</b>（${lastDate}）。`;
+      } else if (diffDays > 1) {
+        infoText = `📅 上次记收益是 <b>${lastDate}</b>（已隔 ${diffDays} 天）。<br>如果要补记前几天的收益，请在下方修改日期。`;
+      }
+    }
+
     UI.form('记录「' + acc.name + '」收益', [
+      { type: 'info', label: infoText }, // 👈 插入提示
       { name: 'amt', label: '本次收益金额（元）', type: 'number', value: '', required: true, placeholder: '例如：0.71' },
       { name: 'date', label: '日期', type: 'date', value: U.todayStr(), required: true },
       { name: 'note', label: '备注（可选）', value: '基金收益' }
@@ -859,7 +883,19 @@
         <div class="acc-sheet-btns">
           <button class="acc-sheet-btn primary" data-acc-act="add"><span class="acc-sheet-icon">📥</span>存入</button>
           <button class="acc-sheet-btn" data-acc-act="sub"><span class="acc-sheet-icon">📤</span>取出</button>
-          <button class="acc-sheet-btn" data-acc-act="profit" style="background:#e8f5e9; color:#2e7d32;"><span class="acc-sheet-icon">📈</span>记收益</button>
+          <button class="acc-sheet-btn" data-acc-act="profit" style="background:#e8f5e9; color:#2e7d32; flex-direction:column; gap:4px; padding:10px;">
+  <div style="display:flex; align-items:center; gap:6px;"><span class="acc-sheet-icon">📈</span>记收益</div>
+  <div style="font-size:10px; opacity:.7; font-weight:normal;">
+    ${(() => {
+      const profits = (acc.transactions || []).filter(t => t.type === 'profit').sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      if (!profits.length) return '尚未记录';
+      const diff = Math.round((parseLocalDate(U.todayStr()) - parseLocalDate(profits[0].date)) / 86400000);
+      if (diff === 0) return '今天已记';
+      if (diff === 1) return '上次: 昨天';
+      return `上次: ${profits[0].date.slice(5)} (隔${diff}天)`;
+    })()}
+  </div>
+</button>
           <button class="acc-sheet-btn" data-acc-act="edit"><span class="acc-sheet-icon">✏️</span>编辑</button>
         </div>
         <button class="acc-sheet-btn acc-sheet-detail" data-acc-act="detail"><span class="acc-sheet-icon">📊</span>查看详情</button>
