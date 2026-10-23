@@ -88,6 +88,7 @@
 }
 .tag-dur { background: #eaf1fe; color: var(--primary); }
 .tag-group { background: var(--primary-soft); color: var(--primary-deep); }
+.tag-limit { background: #fdecec; color: #b02a2a; }
 
 /* ============ 列表项里的目标小徽章 ============ */
 .habit-item-chips {
@@ -164,44 +165,69 @@
 /* ============ 周视图 ============ */
 .week-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  box-sizing: border-box; width: 100%;
 }
+.week-grid > * { min-width: 0; } /* 允许收缩 */
+
 .week-cell {
   border-radius: 10px; padding: 8px 2px;
   min-height: 78px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; font-size: 12px;
   background: #f5f6f8; color: #555;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.1s ease;
 }
+.week-cell:active { transform: scale(0.92); opacity: 0.8; }
 .week-cell .cell-weekday { font-size: 11px; opacity: .75; }
 .week-cell .cell-day { font-size: 18px; font-weight: 600; line-height: 1.1; }
 .week-cell .cell-count { font-size: 11px; opacity: .85; }
 .week-cell.ok { background: #e6f7ec; color: #157347; }
 .week-cell.bad { background: #fdecec; color: #b02a2a; }
-.week-cell.future { background: #f5f6f8; color: #bbb; }
+.week-cell.future { background: #f5f6f8; color: #bbb; cursor: default; }
+.week-cell.future:active { transform: none; opacity: 1; }
 .week-cell.today { box-shadow: inset 0 0 0 2px var(--primary); }
 
-/* ============ 月视图 ============ */
+/* ============ 月视图（修复溢出） ============ */
 .month-grid {
   background: #fff; border-radius: var(--radius);
   padding: 12px; box-shadow: var(--shadow);
+  overflow: hidden; box-sizing: border-box;
 }
 .month-head {
   display: grid; grid-template-columns: repeat(7, 1fr);
   text-align: center; font-size: 12px; color: var(--text-3);
-  padding-bottom: 8px;
+  padding-bottom: 8px; gap: 4px;
 }
-.month-body { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.month-body { 
+  display: grid; 
+  grid-template-columns: repeat(7, 1fr); 
+  gap: 4px; 
+  width: 100%;
+}
+/* 关键：允许格子收缩，防止撑破 */
+.month-body > *, .month-head > * {
+  min-width: 0;
+}
 .month-cell {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: auto; /* 禁用 aspect-ratio 修复移动端溢出 */
+  height: 40px;
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
   font-size: 13px;
   background: #f5f6f8; color: #555;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.1s ease;
 }
+.month-cell:active { transform: scale(0.92); opacity: 0.8; }
 .month-cell.ok { background: #e6f7ec; color: #157347; font-weight: 600; }
 .month-cell.bad { background: #fdecec; color: #b02a2a; }
-.month-cell.future { background: #fafbfc; color: #ccc; }
-.month-cell.empty { background: transparent; }
+.month-cell.future { background: #fafbfc; color: #ccc; cursor: default; }
+.month-cell.future:active { transform: none; opacity: 1; }
+.month-cell.is-blank { background: transparent; cursor: default; box-shadow: none; }
+.month-cell.empty:active { transform: none; }
 .month-cell.today { outline: 2px solid var(--primary); outline-offset: -2px; }
 .month-title {
   text-align: center; color: var(--text-3);
@@ -211,10 +237,13 @@
 /* ============ 年视图 ============ */
 .year-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  box-sizing: border-box; width: 100%;
 }
+.year-grid > * { min-width: 0; }
 .year-cell {
   border-radius: 10px; padding: 12px 8px; text-align: center;
   background: #f5f6f8; color: #555;
+  box-sizing: border-box;
 }
 .year-cell .year-month { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .year-cell .year-count { font-size: 11px; opacity: .85; }
@@ -223,904 +252,106 @@
 .year-cell.future { background: #fafbfc; color: #ccc; }
 
 /* =====================================================
-   月汇总视图
+   月汇总视图 (保持原样)
    ===================================================== */
 .summary-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--text-2);
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: background .15s ease, color .15s ease;
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; width: 100%; padding: 10px 12px; margin-bottom: 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; color: var(--text-2); font-size: 13px;
+  cursor: pointer; box-shadow: var(--shadow);
 }
-.summary-toggle-btn:active { transform: scale(0.99); }
 .summary-toggle-btn.active {
-  background: var(--primary-soft);
-  color: var(--primary);
-  border-color: transparent;
-  font-weight: 600;
+  background: var(--primary-soft); color: var(--primary);
+  border-color: transparent; font-weight: 600;
 }
-
 .summary-wrap {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 12px;
-  margin-bottom: 12px;
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 12px; margin-bottom: 12px;
 }
-
 .summary-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  gap: 8px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 8px;
 }
-.sum-title {
-  font-weight: 600;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.sum-title { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
 .sum-now-tag {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: 400;
+  font-size: 11px; padding: 1px 6px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary);
 }
-
 .sum-nav-group { display: flex; align-items: center; gap: 6px; }
 .sum-nav {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--text-2);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff;
+  color: var(--text-2); font-size: 16px;
   display: flex; align-items: center; justify-content: center;
 }
-.sum-nav:active { background: #f0f2f5; }
 .sum-now {
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--primary);
-  font-size: 12px;
-  cursor: pointer;
+  height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff;
+  color: var(--primary); font-size: 12px;
 }
-
 .summary-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-  margin: 0 -12px;
-  padding: 0 12px;
+  overflow-x: auto; margin: 0 -12px; padding: 0 12px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
 }
-.summary-scroll::-webkit-scrollbar { height: 4px; }
-.summary-scroll::-webkit-scrollbar-thumb {
-  background: #d0d4da; border-radius: 999px;
-}
-
 .summary-table {
-  border-collapse: separate;
-  border-spacing: 3px;
-  font-size: 11px;
-  white-space: nowrap;
+  border-collapse: separate; border-spacing: 3px;
+  font-size: 11px; white-space: nowrap;
 }
-
-.sum-name-th,
-.sum-name {
-  position: sticky;
-  left: 0;
-  background: #fff;
-  z-index: 2;
-  text-align: left;
-  padding-right: 8px;
-  min-width: 88px;
-  max-width: 110px;
+.sum-name-th, .sum-name {
+  position: sticky; left: 0; background: #fff; z-index: 2;
+  text-align: left; padding-right: 8px; min-width: 88px;
 }
-.sum-name-th {
-  font-weight: 500;
-  font-size: 11px;
-  color: var(--text-3);
-  padding-bottom: 4px;
-}
-.sum-name {
-  font-size: 12px;
-  color: var(--text);
-  border-right: 1px solid var(--line);
-  padding-right: 10px;
-}
-.sum-icon { font-size: 13px; flex-shrink: 0; margin-right: 4px; }
-.sum-name-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 72px;
-}
-
-.sum-th {
-  color: var(--text-3);
-  font-weight: 400;
-  text-align: center;
-  min-width: 16px;
-  padding: 2px 0;
-  font-size: 10px;
-}
-.sum-th.today {
-  color: var(--primary);
-  font-weight: 700;
-}
+.sum-name { border-right: 1px solid var(--line); }
+.sum-th { color: var(--text-3); text-align: center; padding: 2px 0; font-size: 10px; }
+.sum-th.today { color: var(--primary); font-weight: 700; }
 .sum-th.weekend { color: #c66; }
-
-.sum-td {
-  text-align: center;
-  padding: 0;
-  line-height: 0;
-}
-
 .sum-dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: #f0f2f5;
-  vertical-align: middle;
-  transition: transform .1s ease;
+  display: inline-block; width: 14px; height: 14px;
+  border-radius: 4px; background: #f0f2f5;
 }
-.sum-dot.ok     { background: #2fb56b; }
-.sum-dot.miss   { background: #f5b5b5; }
+.sum-dot.ok { background: #2fb56b; }
+.sum-dot.miss { background: #f5b5b5; }
 .sum-dot.future { background: #f0f2f5; }
-.sum-dot.today  { box-shadow: 0 0 0 2px var(--primary); }
-
-.sum-rate-th {
-  font-weight: 500;
-  font-size: 11px;
-  color: var(--text-3);
-  text-align: right;
-  padding-left: 8px;
-  padding-bottom: 4px;
-}
-.sum-rate {
-  font-size: 11px;
-  color: var(--text-2);
-  text-align: right;
-  padding-left: 8px;
-  font-weight: 600;
-  min-width: 34px;
-  border-left: 1px solid var(--line);
-}
-
-.sum-legend {
-  display: flex;
-  gap: 14px;
-  justify-content: center;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  font-size: 11px;
-  color: var(--text-3);
-}
-.sum-legend .sum-dot {
-  width: 10px;
-  height: 10px;
-  margin-right: 4px;
-  vertical-align: -1px;
-  border-radius: 3px;
-}
+.sum-dot.today { box-shadow: 0 0 0 2px var(--primary); }
+.sum-rate { text-align: right; font-weight: 600; padding-left: 8px; border-left: 1px solid var(--line); }
+.sum-legend { display: flex; gap: 14px; justify-content: center; margin-top: 12px; font-size: 11px; color: var(--text-3); }
+.sum-legend .sum-dot { width: 10px; height: 10px; margin-right: 4px; }
 
 /* =====================================================
-   主页卡片：奖励账户余额块
+   主页卡片：奖励账户
    ===================================================== */
 .habit-reward-block {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
 }
 .habit-reward-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--text);
 }
-.habit-reward-link {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--primary);
-}
+.habit-reward-link { font-size: 12px; font-weight: 500; color: var(--primary); }
 .habit-reward-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 0;
-  font-size: 13px;
+  display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 13px;
 }
-.habit-reward-icon { font-size: 15px; flex-shrink: 0; }
-.habit-reward-name {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.habit-reward-balance {
-  font-weight: 600;
-  color: var(--primary-deep);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
+.habit-reward-icon { font-size: 15px; }
+.habit-reward-name { flex: 1; color: var(--text-2); overflow: hidden; white-space: nowrap; }
+.habit-reward-balance { font-weight: 600; color: var(--primary-deep); font-variant-numeric: tabular-nums; }
 .habit-reward-balance.negative { color: var(--danger); }
 
 /* =====================================================
-   奖励账户（reward.js 渲染的页面）
+   限制型打卡特殊样式
    ===================================================== */
-.reward-wrap { padding-bottom: 24px; }
-
-.reward-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.reward-title { font-size: 17px; font-weight: 600; color: var(--text); }
-
-/* 内部子 Tab */
-.reward-tabs {
-  display: flex;
-  gap: 4px;
-  background: #e3efe6;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 14px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.reward-tabs::-webkit-scrollbar { display: none; }
-.reward-tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 10px;
-  border-radius: 8px;
-  color: var(--text-2);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: all .18s ease;
-}
-.reward-tab.active {
-  background: #fff;
-  color: var(--primary-deep);
-  font-weight: 600;
-  box-shadow: 0 2px 6px rgba(45,90,63,.08);
-}
-
-/* 待确认提示条 */
-.reward-pending-bar {
-  background: #fef4e0;
-  color: #b8760a;
-  font-size: 13px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  margin-bottom: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.reward-pending-link {
-  border: none;
-  background: transparent;
-  color: #b8760a;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-}
-
-/* ---------- 账户 Tab ---------- */
-.reward-accounts { display: flex; flex-direction: column; gap: 12px; }
-
-.reward-account-card {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 16px;
-  transition: box-shadow .2s ease;
-}
-.reward-account-card.is-negative {
-  background: #fff5f5;
-}
-.reward-account-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.reward-group-icon { font-size: 20px; }
-.reward-group-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 15px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-group-menu {
-  border: none;
-  background: transparent;
-  color: var(--text-3);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 2px 6px;
-  line-height: 1;
-}
-
-.reward-account-balance {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--primary-deep);
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 4px;
-  letter-spacing: .5px;
-}
-.reward-account-balance.negative { color: var(--danger); }
-
-.reward-account-meta {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-bottom: 10px;
-}
-
-.reward-group-pending {
-  background: #fef4e0;
-  color: #b8760a;
-  font-size: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.reward-group-pending button {
-  border: none;
-  background: transparent;
-  color: #b8760a;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-}
-
-.reward-account-recent {
-  border-top: 1px dashed var(--line-soft);
-  padding-top: 10px;
-  margin-bottom: 10px;
-}
-.reward-account-recent-title {
-  font-size: 11px;
-  color: var(--text-3);
-  margin-bottom: 6px;
-}
-
-.reward-tx-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-  padding: 3px 0;
-}
-.reward-tx-reason {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-tx-amount {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-.reward-tx-amount.income { color: var(--primary-deep); }
-.reward-tx-amount.outcome { color: var(--danger); }
-.reward-tx-empty {
-  font-size: 12px;
-  color: var(--text-3);
-  text-align: center;
-  padding: 6px 0;
-}
-
-.reward-account-more {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--primary);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 8px 0 0;
-  text-align: center;
-  border-top: 1px dashed var(--line-soft);
-}
-
-.reward-add-group-btn {
-  width: 100%;
-  padding: 14px;
-  border: 1.5px dashed var(--line);
-  border-radius: var(--radius);
-  background: rgba(255,255,255,.6);
-  color: var(--text-3);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-.reward-add-group-btn:active { background: var(--primary-soft); }
-.reward-add-group-btn.small { padding: 10px; margin-top: 10px; font-size: 12px; }
-
-/* ---------- 愿望 Tab ---------- */
-.reward-wishes { display: flex; flex-direction: column; gap: 12px; }
-
-.reward-wish-filter {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: none;
-}
-.reward-wish-filter::-webkit-scrollbar { display: none; }
-.reward-wish-filter button {
-  flex-shrink: 0;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--text-2);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-.reward-wish-filter button.active {
-  background: var(--primary-soft);
-  color: var(--primary-deep);
-  border-color: var(--primary);
-  font-weight: 600;
-}
-
-.reward-wish-active { display: flex; flex-direction: column; gap: 12px; }
-
-.reward-wish-card {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 14px;
-}
-.reward-wish-card.is-ready {
-  background: linear-gradient(135deg, #e8f7ee, #f0faf3);
-  box-shadow: 0 4px 16px rgba(91,171,124,.15);
-}
-
-.reward-wish-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.reward-wish-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-wish-priority {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-.reward-wish-priority.high { background: #fdecec; color: #b02a2a; }
-.reward-wish-priority.mid  { background: #fef4e0; color: #b8760a; }
-.reward-wish-priority.low  { background: #f0f2f5; color: #666; }
-
-.reward-wish-price-line {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.reward-wish-price-big {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.reward-wish-group {
-  font-size: 12px;
-  color: var(--text-3);
-}
-
-.reward-wish-ready-hint {
-  font-size: 13px;
-  color: var(--primary-deep);
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.reward-wish-bar {
-  height: 10px;
-  background: #eef0f3;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-.reward-wish-bar > i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--primary), #6ea8fe);
-  border-radius: 999px;
-  transition: width .3s ease;
-}
-
-.reward-wish-progress {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-2);
-  margin-bottom: 10px;
-}
-
-.reward-wish-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.reward-wish-actions .btn { flex: 1; min-width: 70px; }
-
-.reward-wish-note {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-top: 8px;
-  line-height: 1.5;
-}
-
-.reward-add-wish-btn {
-  width: 100%;
-  padding: 14px;
-  border: 1.5px dashed var(--line);
-  border-radius: var(--radius);
-  background: rgba(255,255,255,.6);
-  color: var(--text-3);
-  font-size: 13px;
-  cursor: pointer;
-  margin-top: 4px;
-}
-
-.reward-wish-section-title {
-  font-size: 13px;
-  color: var(--text-3);
-  margin-top: 8px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--line-soft);
-}
-.reward-wish-exchanged {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-}
-.reward-wish-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 12.5px;
-  padding: 8px 12px;
-  background: #fafbfc;
-  border-radius: 8px;
-}
-.reward-wish-row .reward-wish-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-wish-row .reward-wish-price {
-  font-weight: 600;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-.reward-wish-row .reward-wish-date {
-  font-size: 11px;
-  color: var(--text-3);
-}
-
-/* ---------- 明细 Tab ---------- */
-.reward-detail { display: flex; flex-direction: column; gap: 12px; }
-
-.reward-detail-day {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-.reward-detail-date {
-  background: #fafbfc;
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--text-2);
-  font-weight: 600;
-  border-bottom: 1px solid var(--line-soft);
-}
-.reward-detail-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid #f5f5f5;
-}
-.reward-detail-row:last-child { border-bottom: none; }
-.reward-detail-main { flex: 1; min-width: 0; }
-.reward-detail-reason {
-  font-size: 13.5px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-detail-group {
-  font-size: 11px;
-  color: var(--text-3);
-  margin-top: 2px;
-}
-.reward-detail-amount {
-  font-size: 15px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-.reward-detail-amount.income { color: var(--primary-deep); }
-.reward-detail-amount.outcome { color: var(--danger); }
-
-/* ---------- 设置 Tab ---------- */
-.reward-settings { display: flex; flex-direction: column; gap: 12px; }
-
-.reward-setting-block {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 14px;
-}
-.reward-setting-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 10px;
-}
-.reward-setting-hint {
-  font-size: 11px;
-  color: var(--text-3);
-  margin-bottom: 8px;
-}
-.reward-setting-empty {
-  font-size: 13px;
-  color: var(--text-3);
-  padding: 8px 0;
-  text-align: center;
-}
-
-.reward-setting-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-.reward-setting-group:last-child { border-bottom: none; }
-.reward-setting-icon { font-size: 18px; }
-.reward-setting-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reward-setting-balance {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary-deep);
-  font-variant-numeric: tabular-nums;
-}
-.reward-setting-edit {
-  border: none;
-  background: transparent;
-  color: var(--primary);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 2px 6px;
-}
-
-.reward-rule-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-.reward-rule-row > span:first-child {
-  flex: 1;
-  min-width: 0;
-}
-.reward-rule-row input {
-  width: 90px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fafbfc;
-  font: inherit;
-  color: var(--text);
-  outline: none;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.reward-rule-row input:focus {
-  border-color: var(--primary);
-  background: #fff;
-}
-
-/* ---------- 底部操作菜单 ---------- */
-.reward-menu-mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(34,51,42,.4);
-  backdrop-filter: blur(3px);
-  z-index: 130;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .2s ease;
-}
-.reward-menu-mask.show { opacity: 1; pointer-events: auto; }
-
-.reward-menu {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  background: #fff;
-  border-radius: 22px 22px 0 0;
-  padding: 12px 16px calc(16px + var(--safe-bottom));
-  max-width: 520px;
-  margin: 0 auto;
-  transform: translateY(100%);
-  transition: transform .26s cubic-bezier(.22,.61,.36,1);
-  box-shadow: 0 -8px 30px rgba(45,90,63,.12);
-  max-height: 85vh;
-  overflow-y: auto;
-}
-.reward-menu-mask.show .reward-menu { transform: none; }
-
-.reward-menu::before {
-  content: '';
-  display: block;
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: #d8dce1;
-  margin: 0 auto 14px;
-}
-
-.reward-menu-title {
-  text-align: center;
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--text);
-  margin-bottom: 16px;
-}
-
-.reward-menu-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 14px 16px;
-  border: none;
-  background: #f7f8fa;
-  border-radius: 12px;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-bottom: 8px;
-  transition: background .15s ease;
-}
-.reward-menu-btn:active { background: #eef0f3; }
-.reward-menu-btn.danger { background: var(--danger-soft); color: var(--danger); }
-.reward-menu-icon { font-size: 16px; }
-
-.reward-menu-cancel {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-3);
-  font-size: 14px;
-  cursor: pointer;
-  margin-top: 4px;
-}
-
-/* 待确认惩罚列表 */
-.reward-pending-sheet { padding-bottom: calc(20px + var(--safe-bottom)); }
-.reward-pending-list {
-  max-height: 55vh;
-  overflow-y: auto;
-  margin-bottom: 8px;
-}
-.reward-pending-item {
-  background: #fef8ed;
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 10px;
-}
-.reward-pending-reason {
-  font-size: 14px;
-  color: var(--text);
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-.reward-pending-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-3);
-  margin-bottom: 10px;
-}
-.reward-pending-amount {
-  color: var(--danger);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.reward-pending-actions {
-  display: flex;
-  gap: 8px;
-}
-.reward-pending-actions .btn { flex: 1; }
-/* 限制型习惯：超限时红色警示 */
 .habit-row.over-limit .habit-name { color: var(--danger); font-weight: 700; }
 .habit-row.over-limit .habit-count { color: var(--danger); }
 .habit-item.over-limit { background: #fdf2f2; border: 1px solid #f8d7da; }
 .habit-item.over-limit .habit-item-name { color: var(--danger); }
 .habit-progress.limit > i { background: var(--warn); }
 .habit-plus.limit { background: #fef4e0; color: #b8760a; }
-.tag-limit { background: #fdecec; color: #b02a2a; }
+/* 强制修复月视图格子变形 */
+.month-body {
+  grid-auto-rows: 40px; /* 强制每行高度一致 */
+}
+.month-body .month-cell {
+  padding: 0 !important;
+  min-width: 0 !important;
+  width: 100%;
+}

@@ -16,7 +16,7 @@
   }
 
   function normalizeItem(it) {
-    if (!it.type) it.type = 'count'; // count | duration | limit
+    if (!it.type) it.type = 'count';
     if (it.dailyTarget == null) it.dailyTarget = Number(it.target) || 1;
     if (it.weeklyTarget === undefined) it.weeklyTarget = null;
     if (it.monthlyTarget === undefined) it.monthlyTarget = null;
@@ -24,7 +24,6 @@
     if (!it.unit) it.unit = it.type === 'duration' ? '分钟' : (it.type === 'limit' ? '元' : '次');
     if (!it.records) it.records = {};
     
-    // 补全分组：老习惯自动归到第一个分组
     if (!it.groupId && window.Reward) {
       const gs = Reward.getGroups();
       if (gs.length) it.groupId = gs[0].id;
@@ -44,7 +43,6 @@
     else item.records[ds] = v;
   }
 
-  // 计算某月总和
   function getMonthSum(item, ds) {
     const prefix = ds.slice(0, 7);
     return Object.keys(item.records || {}).reduce((sum, key) => {
@@ -53,18 +51,6 @@
     }, 0);
   }
 
-  // 计算某年总和
-  function getYearSum(item, ds) {
-    const prefix = ds.slice(0, 4);
-    return Object.keys(item.records || {}).reduce((sum, key) => {
-      if (key.startsWith(prefix)) return sum + item.records[key];
-      return sum;
-    }, 0);
-  }
-
-  /* =========================================================
-     结算辅助
-     ========================================================= */
   function trySettle(habit, date) {
     if (!window.Reward || !habit) return;
     try { Reward.settleCheck(habit, date); } catch (e) { console.warn(e); }
@@ -108,7 +94,6 @@
     homeCard() {
       const today = U.todayStr();
       const items = activeItems();
-
       const rewardBlock = renderRewardHomeBlock();
 
       if (!items.length) {
@@ -126,10 +111,9 @@
         let countText = '';
 
         if (it.type === 'limit') {
-          // 限制型（越少越好）
           const mSum = getMonthSum(it, today);
           const mTarget = it.monthlyTarget || it.dailyTarget;
-          done = c <= it.dailyTarget && mSum <= mTarget; // 简单判断
+          done = c <= it.dailyTarget && mSum <= mTarget;
           pct = Math.min(100, Math.round(c / it.dailyTarget * 100));
           countText = `${c}/${it.dailyTarget}${it.unit}`;
         } else {
@@ -187,6 +171,38 @@
       }
       if (act === 'habit-summary-now') {
         const now = new Date(); summaryYM = { year: now.getFullYear(), month: now.getMonth() }; ctx.refresh(); return true;
+      }
+
+      /* ---- 补打卡/修改历史 ---- */
+      if (act === 'habit-fix-day') {
+        const id = el.dataset.id;
+        const date = el.dataset.date;
+        const it = getData().items.find(x => x.id === id);
+        if (!it) return true;
+        
+        const currentVal = getCount(it, date);
+        let label = '';
+        if (it.type === 'duration') label = '时长（分钟）';
+        else if (it.type === 'limit') label = '消耗（' + unitOf(it) + '）';
+        else label = '次数（' + unitOf(it) + '）';
+
+        UI.form(`补打卡 · ${it.name}`, [
+          { type: 'info', label: `日期：<b>${U.formatDate(date)}</b><br>填入 0 可清除该天记录。` },
+          { name: 'val', label: label, type: 'number', value: currentVal, required: true }
+        ]).then(r => {
+          if (!r) return;
+          const val = Math.max(0, Number(r.val) || 0);
+          Store.update(KEY, data => {
+            const t = data.items.find(x => x.id === id);
+            if (t) {
+              setCount(t, date, val);
+              trySettle(t, date); // 补打后重新触发奖励结算
+            }
+            return data;
+          });
+          UI.toast('已更新');
+        });
+        return true;
       }
 
       /* ---- 打卡加/减 ---- */
@@ -434,12 +450,8 @@
         const c = getCount(it, ds);
         let ok = false;
         
-        if (it.type === 'limit') {
-          // 限制型，当天 0 或 <= 日限额都算OK（除非月累计超了，为了表格清晰，这里只看当日是否超标）
-          ok = !isFuture && c <= it.dailyTarget;
-        } else {
-          ok = !isFuture && c >= it.dailyTarget;
-        }
+        if (it.type === 'limit') { ok = !isFuture && c <= it.dailyTarget; } 
+        else { ok = !isFuture && c >= it.dailyTarget; }
 
         if (!isFuture) { pastDays++; if (ok) okDays++; }
 
@@ -628,6 +640,9 @@
         ${groupChip}${chips.map(c => `<span class="meta-chip">${U.escape(c)}</span>`).join('')}
       </div>
       ${tabs}
+      <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:-8px;margin-bottom:12px;">
+        💡 点击格子可直接补打或修改历史
+      </div>
       <div class="module-body">${body}</div>
       <div class="detail-legend">
         <span><i class="dot ok"></i>达标/安全</span>
@@ -656,7 +671,8 @@
         cls = ok ? 'ok' : 'bad';
       }
 
-      cells += `<div class="week-cell ${cls} ${isToday ? 'today' : ''}">
+      cells += `<div class="week-cell ${cls} ${isToday ? 'today' : ''}" 
+        data-act="habit-fix-day" data-id="${item.id}" data-date="${ds}">
         <div class="cell-weekday">周${WEEK_CN[i]}</div>
         <div class="cell-day">${d.getDate()}</div>
         <div class="cell-count">${isFuture ? '—' : (isDur || isLimit ? c + '分' : c + '')}</div>
@@ -684,7 +700,7 @@
 
     let monthTotal = 0; let okDays = 0; let pastDays = 0;
     let cells = '';
-    for (let i = 0; i < offset; i++) cells += `<div class="month-cell empty"></div>`;
+   for (let i = 0; i < offset; i++) cells += `<div class="month-cell is-blank"></div>`;
 
     for (let d = 1; d <= dim; d++) {
       const ds = U.todayStr(new Date(year, month, d)); const c = getCount(item, ds);
@@ -698,7 +714,9 @@
         if (ok) okDays++;
       }
       const cls = isFuture ? 'future' : (ok ? 'ok' : 'bad');
-      cells += `<div class="month-cell ${cls} ${isToday ? 'today' : ''}" title="${U.formatDate(ds)}：${fmtVal(item, c)}">${d}</div>`;
+      cells += `<div class="month-cell ${cls} ${isToday ? 'today' : ''}" 
+        title="${U.formatDate(ds)}：${fmtVal(item, c)}"
+        data-act="habit-fix-day" data-id="${item.id}" data-date="${ds}">${d}</div>`;
     }
 
     let summary;
