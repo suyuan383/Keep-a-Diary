@@ -1,9 +1,9 @@
-let listLimit = 10;   // 列表默认显示条数
 (function () {
   const KEY = 'sleep';
-  let viewRange = 'week';   // week | month | year
-  let chartView = 'sleep';   // 'sleep' | 'awake'
+  let viewRange = 'week';
   let anchorDate = null;
+  let listLimit = 10;
+  let chartView = 'sleep'; // sleep | awake
 
   /* =========================================================
      数据层
@@ -11,25 +11,28 @@ let listLimit = 10;   // 列表默认显示条数
   function getData() {
     const d = Store.ensure(KEY, () => ({ records: [] }));
     if (!Array.isArray(d.records)) d.records = [];
+    // 兼容旧数据：如果是小数且小于24，说明是小时，转换为分钟
+    let migrated = false;
+    d.records.forEach(r => {
+      if (r.deepSleep != null && r.deepSleep < 24 && !Number.isInteger(r.deepSleep)) {
+        r.deepSleep = Math.round(r.deepSleep * 60); migrated = true;
+      }
+      if (r.lightSleep != null && r.lightSleep < 24 && !Number.isInteger(r.lightSleep)) {
+        r.lightSleep = Math.round(r.lightSleep * 60); migrated = true;
+      }
+      if (r.remSleep != null && r.remSleep < 24 && !Number.isInteger(r.remSleep)) {
+        r.remSleep = Math.round(r.remSleep * 60); migrated = true;
+      }
+    });
+    if (migrated) {
+      const updater = Store.updateSilent || Store.update;
+      updater.call(Store, KEY, data => { data.records = d.records; return data; });
+    }
     return d;
   }
 
-  function dateStr(d) {
-    return d.getFullYear() + '-' + U.pad(d.getMonth() + 1) + '-' + U.pad(d.getDate());
-  }
-  function parseDate(s) {
-    const p = String(s).split('-');
-    return new Date(+p[0], +p[1] - 1, +p[2]);
-  }
-  function getAnchor() {
-    if (!anchorDate) anchorDate = new Date();
-    return anchorDate;
-  }
-
   /* =========================================================
-     时间处理
-     所有时间点都转成"从 18:00 起算的小时数"
-     23:30 → 5.5    07:00 → 13    12:00(午) → 18
+     时间计算与格式化
      ========================================================= */
   function timeToHours(t) {
     if (!t) return null;
@@ -45,20 +48,37 @@ let listLimit = 10;   // 列表默认显示条数
     const mm = Math.round((total - hh) * 60);
     return U.pad(hh) + ':' + U.pad(mm);
   }
-  // 计算时间差（小时）
   function durationHours(start, end) {
     if (!start || !end) return null;
     const s = timeToHours(start);
     const e = timeToHours(end);
     if (s == null || e == null) return null;
-    // 醒来时间在入睡时间之后（从 18:00 起算的坐标系里）
     return e > s ? e - s : (e + 24) - s;
   }
+  
+  // 🌟 核心逻辑：总睡眠 = 醒来-入睡总跨度 - 清醒时长
+  function calcTotalSleepMins(r) {
+    const durH = durationHours(r.sleepTime, r.wakeTime);
+    if (durH == null) return null;
+    const totalMins = Math.round(durH * 60);
+    const awake = Number(r.awakeTime) || 0;
+    return Math.max(0, totalMins - awake);
+  }
+
   function fmtDuration(h) {
     if (h == null || isNaN(h)) return '—';
     const hh = Math.floor(h);
     const mm = Math.round((h - hh) * 60);
     return hh + 'h' + (mm ? mm + 'm' : '');
+  }
+  
+  function fmtDurationMins(mins) {
+    if (mins == null || mins <= 0) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return m + '分钟';
+    if (m === 0) return h + '小时';
+    return h + '小时' + m + '分';
   }
 
   /* =========================================================
@@ -94,6 +114,18 @@ let listLimit = 10;   // 列表默认显示条数
     return s.getFullYear() + '/' + f(s) + ' - ' + f(e);
   }
 
+  function dateStr(d) {
+    return d.getFullYear() + '-' + U.pad(d.getMonth() + 1) + '-' + U.pad(d.getDate());
+  }
+  function parseDate(s) {
+    const p = String(s).split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  function getAnchor() {
+    if (!anchorDate) anchorDate = new Date();
+    return anchorDate;
+  }
+
   function recordsInRange(range) {
     const s = dateStr(range.start);
     const e = dateStr(range.end);
@@ -103,7 +135,7 @@ let listLimit = 10;   // 列表默认显示条数
   }
 
   /* =========================================================
-     图表：入睡/醒来的柱状 + 折线对比
+     图表：入睡/醒来时间及总睡眠
      ========================================================= */
   function buildSleepChart(series) {
     const W = 360, H = 230;
@@ -117,7 +149,6 @@ let listLimit = 10;   // 列表默认显示条数
       </svg>`;
     }
 
-    // Y 轴范围
     let minH = Infinity, maxH = -Infinity;
     series.forEach(s => {
       const sh = timeToHours(s.sleepTime);
@@ -126,7 +157,6 @@ let listLimit = 10;   // 列表默认显示条数
       if (wh != null) { minH = Math.min(minH, wh); maxH = Math.max(maxH, wh); }
     });
 
-    // 计划线：23:00（= 从 18:00 起算 5 小时）
     const planHour = 23;
     const planH = timeToHours(U.pad(planHour) + ':00');
     minH = Math.min(minH, planH);
@@ -137,12 +167,11 @@ let listLimit = 10;   // 列表默认显示条数
     maxH = Math.ceil(maxH + 1);
     if (maxH - minH < 6) maxH = minH + 6;
 
-  const yScale = h => padT + ((maxH - h) / (maxH - minH)) * ch;
+    const yScale = h => padT + ((maxH - h) / (maxH - minH)) * ch;
     const xScale = i => series.length === 1
       ? padL + cw / 2
       : padL + (i / (series.length - 1)) * cw;
 
-    // 网格 + Y 轴刻度
     let grid = '';
     const steps = 4;
     for (let i = 0; i <= steps; i++) {
@@ -154,7 +183,6 @@ let listLimit = 10;   // 列表默认显示条数
         font-size="9" fill="#a8b3c1">${hoursToTime(hVal)}</text>`;
     }
 
-    // 23:00 计划红线
     const planY = yScale(planH);
     const planLine = `
       <line x1="${padL}" y1="${planY}" x2="${W - padR}" y2="${planY}"
@@ -165,10 +193,6 @@ let listLimit = 10;   // 列表默认显示条数
         font-size="9" fill="#fff" font-weight="600">23:00 计划</text>
     `;
 
-    // 每日柱子：三档颜色
-    //   < 6h      深红
-    //   6h ~ <7h  橙
-    //   >= 7h     绿
     const barW = Math.max(10, Math.min(26, cw / series.length * 0.55));
     let bars = '';
     series.forEach((s, i) => {
@@ -181,29 +205,26 @@ let listLimit = 10;   // 列表默认显示条数
       const y = Math.min(y1, y2);
       const h = Math.max(3, Math.abs(y2 - y1));
 
-      // 时长：优先手环总睡眠，否则用入睡→醒来差值
-      const dur = (s.totalSleep != null && isFinite(s.totalSleep))
-        ? s.totalSleep
-        : durationHours(s.sleepTime, s.wakeTime);
+      // 使用新逻辑计算总睡眠分钟数
+      const totalMins = calcTotalSleepMins(s);
+      let gradId = 'sleepBarGreen';
+      if (totalMins != null) {
+        if (totalMins < 360) gradId = 'sleepBarDeepRed';
+        else if (totalMins < 420) gradId = 'sleepBarOrange';
+      }
 
-      let gradId;
-      if (dur == null) gradId = 'sleepBarGreen';
-      else if (dur < 6) gradId = 'sleepBarDeepRed';
-      else if (dur < 7) gradId = 'sleepBarOrange';
-      else gradId = 'sleepBarGreen';
-
-            bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}"
+      bars += `<rect x="${x}" y="${y}" width="${barW}" height="${h}"
         rx="4" fill="url(#${gradId})"/>`;
 
       // 柱体上显示时长
-      if (dur != null && h >= 22) {
+      if (totalMins != null && h >= 22) {
         let durText = '';
         if (barW >= 22) {
-          const hh = Math.floor(dur);
-          const mm = Math.round((dur - hh) * 60);
+          const hh = Math.floor(totalMins / 60);
+          const mm = totalMins % 60;
           durText = hh + 'h' + (mm ? String(mm).padStart(2, '0') : '');
         } else if (barW >= 14) {
-          durText = Math.round(dur) + 'h';
+          durText = Math.round(totalMins / 60) + 'h';
         }
         if (durText) {
           bars += `<text x="${xScale(i)}" y="${y + h / 2 + 3.5}"
@@ -215,7 +236,6 @@ let listLimit = 10;   // 列表默认显示条数
       }
     });
 
-    // 折线（入睡 + 醒来）
     const sleepPts = [];
     const wakePts = [];
     series.forEach((s, i) => {
@@ -236,7 +256,6 @@ let listLimit = 10;   // 列表默认显示条数
         stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
     }
 
-    // 数据点
     let dots = '';
     series.forEach((s, i) => {
       const sh = timeToHours(s.sleepTime);
@@ -247,7 +266,6 @@ let listLimit = 10;   // 列表默认显示条数
         fill="#f0a020" stroke="#fff" stroke-width="1.5"/>`;
     });
 
-    // X 轴标签
     let xLabels = '';
     const maxLabels = 7;
     const step = Math.max(1, Math.ceil(series.length / maxLabels));
@@ -280,8 +298,9 @@ let listLimit = 10;   // 列表默认显示条数
       ${xLabels}
     </svg>`;
   }
-    /* =========================================================
-     清醒总时长柱状图
+
+  /* =========================================================
+     清醒图表
      ========================================================= */
   function buildAwakeBarChart(series) {
     const W = 360, H = 180;
@@ -325,7 +344,6 @@ let listLimit = 10;   // 列表默认显示条数
         const y = padT + ch - h;
         bars += `<rect x="${cx - barW / 2}" y="${y}" width="${barW}" height="${h}" rx="3"
           fill="url(#awakeBarGrad)"/>`;
-        // 值标在柱子上
         bars += `<text x="${cx}" y="${y - 3}" text-anchor="middle"
           font-size="9" font-weight="600" fill="#b8760a">${s.awakeTime}</text>`;
       }
@@ -349,9 +367,6 @@ let listLimit = 10;   // 列表默认显示条数
     </svg>`;
   }
 
-  /* =========================================================
-     清醒次数折线图
-     ========================================================= */
   function buildAwakeLineChart(series) {
     const W = 360, H = 180;
     const padL = 46, padR = 14, padT = 18, padB = 32;
@@ -383,7 +398,6 @@ let listLimit = 10;   // 列表默认显示条数
       grid += `<text x="${padL - 6}" y="${y + 3.5}" text-anchor="end" font-size="9" fill="#a8b3c1">${Math.round(v)}次</text>`;
     }
 
-    // 收集有效点
     const pts = [];
     series.forEach((s, i) => {
       if (s.awakeCount != null) {
@@ -425,64 +439,39 @@ let listLimit = 10;   // 列表默认显示条数
       ${xLabels}
     </svg>`;
   }
-  /* =========================================================
-     序列化（跨天/跨范围）
-     ========================================================= */
-  function buildSeries() {
-    const range = getRange(viewRange, getAnchor());
-    const recs = recordsInRange(range);
-    return recs.map(r => ({
-      date: r.date,
-      label: (() => {
-        const d = parseDate(r.date);
-        return (d.getMonth() + 1) + '/' + d.getDate();
-      })(),
-      sleepTime: r.sleepTime,
-      wakeTime: r.wakeTime,
-      raw: r
-    }));
-  }
 
   /* =========================================================
-     统计
+     统计逻辑
      ========================================================= */
   function computeStats(recs) {
     const sleepRecs = recs.filter(r => r.sleepTime && r.wakeTime);
     if (!sleepRecs.length) return null;
 
-    let sumSleepH = 0, sumWakeH = 0, sumDuration = 0;
+    let sumSleepH = 0, sumWakeH = 0, sumTotalMins = 0;
     sleepRecs.forEach(r => {
       sumSleepH += timeToHours(r.sleepTime);
       sumWakeH  += timeToHours(r.wakeTime);
-      sumDuration += durationHours(r.sleepTime, r.wakeTime);
+      sumTotalMins += (calcTotalSleepMins(r) || 0);
     });
     const n = sleepRecs.length;
 
-    // 手环数据汇总
-    const withTotal = recs.filter(r => r.totalSleep != null);
-    const avgTotal = withTotal.length
-      ? withTotal.reduce((s, r) => s + r.totalSleep, 0) / withTotal.length
-      : sumDuration / n;
+    const avgTotalH = sumTotalMins / n / 60;
 
-    const withDeep = recs.filter(r => r.deepSleep != null);
+    const withDeep = recs.filter(r => r.deepSleep != null && r.deepSleep > 0);
     const avgDeep = withDeep.length
-      ? withDeep.reduce((s, r) => s + r.deepSleep, 0) / withDeep.length : null;
+      ? withDeep.reduce((s, r) => s + r.deepSleep, 0) / withDeep.length / 60 : null;
 
-    const withRem = recs.filter(r => r.remSleep != null);
+    const withRem = recs.filter(r => r.remSleep != null && r.remSleep > 0);
     const avgRem = withRem.length
-      ? withRem.reduce((s, r) => s + r.remSleep, 0) / withRem.length : null;
+      ? withRem.reduce((s, r) => s + r.remSleep, 0) / withRem.length / 60 : null;
 
-    // 平均入睡/醒来时间：用"循环均值"处理跨午夜
-    // 简单处理：直接算算术平均（18:00 起算坐标系里天然不会跨 0）
     return {
       count: n,
       avgSleep: hoursToTime(sumSleepH / n),
       avgWake:  hoursToTime(sumWakeH / n),
-      avgDuration: avgTotal,
+      avgDuration: avgTotalH,
       avgDeep,
-      avgRem,
-      avgSleepH: sumSleepH / n,
-      avgWakeH: sumWakeH / n
+      avgRem
     };
   }
 
@@ -490,54 +479,36 @@ let listLimit = 10;   // 列表默认显示条数
      注册模块
      ========================================================= */
   Registry.register({
-    id: 'sleep',
-    name: '睡眠记录',
-    icon: '🌙',
-    order: 25,
-    storageKey: KEY,
+    id: 'sleep', name: '睡眠记录', icon: '🌙', order: 25, storageKey: KEY,
 
     homeCard() {
-      const today = U.todayStr();
       const all = getData().records;
       if (!all.length) {
-        return `<div class="card">
-          <div class="card-head">
-            <span class="card-icon">🌙</span>
-            <span class="card-title">睡眠记录</span>
-            <a class="card-more" href="#sleep">记录 ›</a>
-          </div>
-          <div class="card-empty">还没有记录，点击右上角开始</div>
-        </div>`;
+        return `<div class="card"><div class="card-head"><span class="card-icon">🌙</span><span class="card-title">睡眠记录</span><a class="card-more" href="#sleep">记录 ›</a></div><div class="card-empty">还没有记录，点击右上角开始</div></div>`;
       }
 
-      // 最近一条记录（按日期倒序）
       const sorted = all.slice().sort((a, b) => b.date.localeCompare(a.date));
       const latest = sorted[0];
-      const isToday = latest.date === today;
-      const dur = durationHours(latest.sleepTime, latest.wakeTime);
+      const isToday = latest.date === U.todayStr();
+      
+      const totalMins = calcTotalSleepMins(latest);
+      const totalText = totalMins != null ? fmtDuration(totalMins / 60) : '—';
 
-      // 近 7 天平均睡眠时长
       const last7 = all.filter(r => {
         const d = parseDate(r.date);
         const diff = (new Date() - d) / 86400000;
-        return diff <= 7 && r.totalSleep != null;
+        return diff <= 7 && calcTotalSleepMins(r) != null;
       });
-      const avg7 = last7.length
-        ? last7.reduce((s, r) => s + r.totalSleep, 0) / last7.length : null;
+      const avg7 = last7.length ? last7.reduce((s, r) => s + calcTotalSleepMins(r), 0) / last7.length / 60 : null;
 
       return `<div class="card">
-        <div class="card-head">
-          <span class="card-icon">🌙</span>
-          <span class="card-title">睡眠记录</span>
-          <span class="card-sub">${isToday ? '昨晚' : U.formatDate(latest.date)}</span>
-          <a class="card-more" href="#sleep">详情 ›</a>
-        </div>
+        <div class="card-head"><span class="card-icon">🌙</span><span class="card-title">睡眠记录</span><span class="card-sub">${isToday ? '昨晚' : U.formatDate(latest.date)}</span><a class="card-more" href="#sleep">详情 ›</a></div>
         <div class="sleep-home-body">
           <div class="sleep-home-row">
             <span class="sleep-home-time">${U.escape(latest.sleepTime || '—')}</span>
             <span class="sleep-home-arrow">→</span>
             <span class="sleep-home-time">${U.escape(latest.wakeTime || '—')}</span>
-            ${dur != null ? `<span class="sleep-home-dur">${fmtDuration(dur)}</span>` : ''}
+            ${totalText !== '—' ? `<span class="sleep-home-dur">${totalText}</span>` : ''}
           </div>
           ${avg7 != null ? `<div class="sleep-home-sub">近 7 天平均 <b>${avg7.toFixed(1)}h</b></div>` : ''}
           ${latest.napStart && latest.napEnd ? `<div class="sleep-home-nap">😴 午休 ${U.escape(latest.napStart)}-${U.escape(latest.napEnd)}</div>` : ''}
@@ -548,82 +519,50 @@ let listLimit = 10;   // 列表默认显示条数
     page() { return renderPage(); },
 
     handleAction(act, el, ctx) {
-      /* 范围切换 */
-      if (act === 'sleep-range') {
-        viewRange = el.dataset.range;
-        listLimit = 10;
-        ctx.refresh();
-        return true;
-      }
-            if (act === 'sleep-chart-view') {
-        chartView = el.dataset.view;
-        ctx.refresh();
-        return true;
-      }
-            /* 加载更多 */
-      if (act === 'sleep-load-more') {
-        listLimit += 20;
-        ctx.refresh();
-        return true;
-      }
-      /* 前后翻页 */
+      if (act === 'sleep-range') { viewRange = el.dataset.range; listLimit = 10; ctx.refresh(); return true; }
+      if (act === 'sleep-chart-view') { chartView = el.dataset.view; ctx.refresh(); return true; }
       if (act === 'sleep-prev' || act === 'sleep-next') {
         const dir = act === 'sleep-prev' ? -1 : 1;
         const a = getAnchor();
         if (viewRange === 'week') a.setDate(a.getDate() + 7 * dir);
         else if (viewRange === 'month') a.setMonth(a.getMonth() + dir);
         else a.setFullYear(a.getFullYear() + dir);
-        anchorDate = a;
-        listLimit = 10;
-        ctx.refresh();
-        return true;
+        anchorDate = a; listLimit = 10; ctx.refresh(); return true;
       }
-      if (act === 'sleep-now') {
-        anchorDate = new Date();
-        listLimit = 10;
-        ctx.refresh();
-        return true;
-      }
-      /* 新增 */
+      if (act === 'sleep-now') { anchorDate = new Date(); listLimit = 10; ctx.refresh(); return true; }
+
       if (act === 'sleep-add') { openForm(null); return true; }
-      if (act === 'sleep-edit') {
-        const rec = getData().records.find(r => r.id === el.dataset.id);
-        if (rec) openForm(rec);
-        return true;
-      }
+      if (act === 'sleep-edit') { const rec = getData().records.find(r => r.id === el.dataset.id); if (rec) openForm(rec); return true; }
       if (act === 'sleep-del') {
         const id = el.dataset.id;
         UI.confirm('确定删除这条记录吗？').then(ok => {
           if (!ok) return;
-          Store.update(KEY, d => {
-            d.records = d.records.filter(r => r.id !== id);
-            return d;
-          });
+          Store.update(KEY, d => { d.records = d.records.filter(r => r.id !== id); return d; });
         });
         return true;
       }
+      if (act === 'sleep-load-more') { listLimit += 20; ctx.refresh(); return true; }
+
       return false;
     }
   });
 
   /* =========================================================
-     页面
+     主页面渲染
      ========================================================= */
   function renderPage() {
     const range = getRange(viewRange, getAnchor());
     const recs = recordsInRange(range);
-const series = recs.map(r => ({
-  date: r.date,
-  label: (() => {
-    const d = parseDate(r.date);
-    return (d.getMonth() + 1) + '/' + d.getDate();
-  })(),
-  sleepTime: r.sleepTime,
-  wakeTime: r.wakeTime,
-  totalSleep: r.totalSleep,
-  awakeCount: r.awakeCount,
-  awakeTime: r.awakeTime
-}));
+    
+    const series = recs.map(r => ({
+      date: r.date,
+      label: (() => { const d = parseDate(r.date); return (d.getMonth() + 1) + '/' + d.getDate(); })(),
+      sleepTime: r.sleepTime,
+      wakeTime: r.wakeTime,
+      awakeCount: r.awakeCount,
+      awakeTime: r.awakeTime
+    }));
+
     const rangeSwitcher = `
       <div class="tabs">
         <button class="tab ${viewRange === 'week' ? 'active' : ''}" data-act="sleep-range" data-range="week">周</button>
@@ -641,69 +580,66 @@ const series = recs.map(r => ({
         </div>
       </div>`;
 
-const chartSwitch = `
-  <div class="tabs sleep-chart-tabs">
-    <button class="tab ${chartView === 'sleep' ? 'active' : ''}" data-act="sleep-chart-view" data-view="sleep">睡眠</button>
-    <button class="tab ${chartView === 'awake' ? 'active' : ''}" data-act="sleep-chart-view" data-view="awake">清醒</button>
-  </div>`;
+    const chartSwitch = `
+      <div class="tabs sleep-chart-tabs">
+        <button class="tab ${chartView === 'sleep' ? 'active' : ''}" data-act="sleep-chart-view" data-view="sleep">睡眠</button>
+        <button class="tab ${chartView === 'awake' ? 'active' : ''}" data-act="sleep-chart-view" data-view="awake">清醒</button>
+      </div>`;
 
-let chart = '';
-if (chartView === 'sleep') {
-  chart = `
-    <div class="chart-card sleep-chart-card">
-      <div class="chart-title">
-        <span>入睡 / 醒来时间</span>
-        <span class="sleep-legend">
-          <i class="dot-sleep"></i>入睡
-          <i class="dot-wake"></i>醒来
-        </span>
-      </div>
-      ${buildSleepChart(series)}
-      <div class="sleep-chart-hint">柱 = 整晚睡眠段 · 线 = 每日入睡/醒来时间</div>
-      <div class="sleep-chart-hint sleep-chart-legend">
-        <span><i class="hint-dot green"></i>7h 及以上</span>
-        <span><i class="hint-dot orange"></i>6~7h</span>
-        <span><i class="hint-dot deepred"></i>少于 6h</span>
-        <span><i class="hint-dash"></i>23:00 计划</span>
-      </div>
-    </div>`;
-} else {
-  chart = `
-    <div class="chart-card sleep-chart-card">
-      <div class="chart-title">
-        <span>清醒总时长</span>
-        <span class="chart-unit">分钟</span>
-      </div>
-      ${buildAwakeBarChart(series)}
-      <div class="sleep-chart-hint">柱 = 每晚清醒总时长</div>
-    </div>
-    <div class="chart-card sleep-chart-card">
-      <div class="chart-title">
-        <span>清醒次数</span>
-        <span class="chart-unit">次</span>
-      </div>
-      ${buildAwakeLineChart(series)}
-      <div class="sleep-chart-hint">线 = 每晚清醒次数</div>
-    </div>`;
-}
+    let chart = '';
+    if (chartView === 'sleep') {
+      chart = `
+        <div class="chart-card sleep-chart-card">
+          <div class="chart-title">
+            <span>入睡 / 醒来时间</span>
+            <span class="sleep-legend">
+              <i class="dot-sleep"></i>入睡
+              <i class="dot-wake"></i>醒来
+            </span>
+          </div>
+          ${buildSleepChart(series)}
+          <div class="sleep-chart-hint">柱 = 总睡眠段（即醒-睡跨度扣除清醒时间）· 线 = 每日入睡/醒来时间</div>
+          <div class="sleep-chart-hint sleep-chart-legend">
+            <span><i class="hint-dot green"></i>7h 及以上</span>
+            <span><i class="hint-dot orange"></i>6~7h</span>
+            <span><i class="hint-dot deepred"></i>少于 6h</span>
+            <span><i class="hint-dash"></i>23:00 计划</span>
+          </div>
+        </div>`;
+    } else {
+      chart = `
+        <div class="chart-card sleep-chart-card">
+          <div class="chart-title">
+            <span>清醒总时长</span>
+            <span class="chart-unit">分钟</span>
+          </div>
+          ${buildAwakeBarChart(series)}
+          <div class="sleep-chart-hint">柱 = 每晚清醒总时长</div>
+        </div>
+        <div class="chart-card sleep-chart-card">
+          <div class="chart-title">
+            <span>清醒次数</span>
+            <span class="chart-unit">次</span>
+          </div>
+          ${buildAwakeLineChart(series)}
+          <div class="sleep-chart-hint">线 = 每晚清醒次数</div>
+        </div>`;
+    }
 
     const stats = renderStats(recs);
     const list = renderList(recs);
 
-return `<div class="module sleep-module">
-  ${rangeSwitcher}
-  ${head}
-  ${chartSwitch}
-  ${chart}
-  ${stats}
-  ${list}
-  <button class="fab" data-act="sleep-add" aria-label="新增睡眠记录">+</button>
-</div>`;
+    return `<div class="module sleep-module">
+      ${rangeSwitcher}
+      ${head}
+      ${chartSwitch}
+      ${chart}
+      ${stats}
+      ${list}
+      <button class="fab" data-act="sleep-add" aria-label="新增睡眠记录">+</button>
+    </div>`;
   }
 
-  /* =========================================================
-     统计卡
-     ========================================================= */
   function renderStats(recs) {
     const s = computeStats(recs);
     if (!s) return '';
@@ -729,53 +665,39 @@ return `<div class="module sleep-module">
     </div>`;
   }
 
-  /* =========================================================
-     记录列表
-     ========================================================= */
   function renderList(recs) {
     if (!recs.length) {
-      return `<div class="empty" data-emoji="🌙">
-        这段时间还没有记录<br>
-        <button class="btn btn-primary" data-act="sleep-add" style="margin-top:12px">+ 记录睡眠</button>
-      </div>`;
+      return `<div class="empty" data-emoji="🌙">这段时间还没有记录<br><button class="btn btn-primary" data-act="sleep-add" style="margin-top:12px">+ 记录睡眠</button></div>`;
     }
 
-    // 倒序：最新在上
     const sorted = recs.slice().sort((a, b) => b.date.localeCompare(a.date));
     const shown = sorted.slice(0, listLimit);
     const hasMore = sorted.length > listLimit;
     const remain = sorted.length - listLimit;
 
-    let html = `<div class="sleep-list">
-      ${shown.map(r => renderItem(r)).join('')}
-    </div>`;
+    let html = `<div class="sleep-list">${shown.map(r => renderItem(r)).join('')}</div>`;
 
     if (hasMore) {
-      html += `<button class="btn btn-ghost sleep-load-more" data-act="sleep-load-more">
-        显示更多 · 还有 ${remain} 条
-      </button>`;
+      html += `<button class="btn btn-ghost sleep-load-more" data-act="sleep-load-more">显示更多 · 还有 ${remain} 条</button>`;
     }
 
     return html;
   }
 
   function renderItem(r) {
-    const dur = durationHours(r.sleepTime, r.wakeTime);
+    const totalMins = calcTotalSleepMins(r);
+    const totalText = totalMins != null ? fmtDuration(totalMins / 60) : '—';
     const d = parseDate(r.date);
     const today = U.todayStr();
-    const dateLabel = r.date === today ? '今天'
-      : (U.formatDate(r.date) + ' · ' + U.weekday(d));
+    const dateLabel = r.date === today ? '今天' : (U.formatDate(r.date) + ' · ' + U.weekday(d));
 
-    // 手环数据徽章
     const chips = [];
-    if (r.totalSleep != null) chips.push(`总 ${r.totalSleep.toFixed(1)}h`);
-    if (r.deepSleep != null)  chips.push(`深睡 ${r.deepSleep.toFixed(1)}h`);
-    if (r.lightSleep != null) chips.push(`浅睡 ${r.lightSleep.toFixed(1)}h`);
-    if (r.remSleep != null)   chips.push(`REM ${r.remSleep.toFixed(1)}h`);
-    if (r.awakeCount != null) chips.push(`醒 ${r.awakeCount}次`);
-    if (r.awakeTime != null)  chips.push(`清醒 ${r.awakeTime}分`);
+    if (r.deepSleep != null && r.deepSleep > 0) chips.push(`深睡 ${fmtDurationMins(r.deepSleep)}`);
+    if (r.lightSleep != null && r.lightSleep > 0) chips.push(`浅睡 ${fmtDurationMins(r.lightSleep)}`);
+    if (r.remSleep != null && r.remSleep > 0) chips.push(`REM ${fmtDurationMins(r.remSleep)}`);
+    if (r.awakeCount != null && r.awakeCount > 0) chips.push(`醒 ${r.awakeCount}次`);
+    if (r.awakeTime != null && r.awakeTime > 0) chips.push(`清醒 ${r.awakeTime}分`);
 
-    // 午休
     let napHtml = '';
     if (r.napStart && r.napEnd) {
       const nd = durationHours(r.napStart, r.napEnd);
@@ -794,7 +716,7 @@ return `<div class="module sleep-module">
         <span class="sleep-time">${U.escape(r.sleepTime || '—')}</span>
         <span class="sleep-arrow">→</span>
         <span class="sleep-time">${U.escape(r.wakeTime || '—')}</span>
-        ${dur != null ? `<span class="sleep-dur">${fmtDuration(dur)}</span>` : ''}
+        ${totalText !== '—' ? `<span class="sleep-dur">${totalText}</span>` : ''}
       </div>
       ${chips.length ? `<div class="sleep-chips">${chips.map(c => `<span class="sleep-chip">${c}</span>`).join('')}</div>` : ''}
       ${napHtml}
@@ -806,51 +728,57 @@ return `<div class="module sleep-module">
      ========================================================= */
   function openForm(editing) {
     const fields = [
-      { name: 'date',      label: '日期（起床日）', type: 'date',
-        value: editing ? editing.date : U.todayStr(), required: true },
-      { name: 'sleepTime', label: '入睡时间', type: 'time',
-        value: editing ? editing.sleepTime : '23:00', required: true },
-      { name: 'wakeTime',  label: '醒来时间', type: 'time',
-        value: editing ? editing.wakeTime : '07:00', required: true },
-
-      { name: 'totalSleep', label: '总睡眠（小时，可留空）', type: 'number',
-        value: editing && editing.totalSleep != null ? editing.totalSleep : '' },
-      { name: 'deepSleep',  label: '深度睡眠（小时）', type: 'number',
-        value: editing && editing.deepSleep != null ? editing.deepSleep : '' },
-      { name: 'lightSleep', label: '浅度睡眠（小时）', type: 'number',
-        value: editing && editing.lightSleep != null ? editing.lightSleep : '' },
-      { name: 'remSleep',   label: '快速眼动（小时）', type: 'number',
-        value: editing && editing.remSleep != null ? editing.remSleep : '' },
-      { name: 'awakeCount', label: '清醒次数', type: 'number',
-        value: editing && editing.awakeCount != null ? editing.awakeCount : '' },
-      { name: 'awakeTime',  label: '总清醒（分钟）', type: 'number',
-        value: editing && editing.awakeTime != null ? editing.awakeTime : '' },
-
-      { name: 'napStart', label: '午休开始（可留空）', type: 'time',
-        value: editing ? (editing.napStart || '') : '' },
-      { name: 'napEnd',   label: '午休结束（可留空）', type: 'time',
-        value: editing ? (editing.napEnd || '') : '' },
-
-      { name: 'note', label: '备注（可选）', type: 'textarea',
-        value: editing ? (editing.note || '') : '' }
+      { name: 'date',      label: '日期（起床日）', type: 'date', value: editing ? editing.date : U.todayStr(), required: true },
+      { name: 'sleepTime', label: '入睡时间', type: 'time', value: editing ? editing.sleepTime : '23:00', required: true },
+      { name: 'wakeTime',  label: '醒来时间', type: 'time', value: editing ? editing.wakeTime : '07:00', required: true },
+      { name: 'awakeCount', label: '清醒次数（可留空）', type: 'number', value: editing && editing.awakeCount != null ? editing.awakeCount : '' },
+      { name: 'awakeTime',  label: '总清醒时长（分钟，可留空）', type: 'number', value: editing && editing.awakeTime != null ? editing.awakeTime : '' }
     ];
+
+    // 把分钟拆成小时和分钟，方便用户填
+    const deepH = editing && editing.deepSleep ? Math.floor(editing.deepSleep / 60) : '';
+    const deepM = editing && editing.deepSleep ? editing.deepSleep % 60 : '';
+    const lightH = editing && editing.lightSleep ? Math.floor(editing.lightSleep / 60) : '';
+    const lightM = editing && editing.lightSleep ? editing.lightSleep % 60 : '';
+    const remH = editing && editing.remSleep ? Math.floor(editing.remSleep / 60) : '';
+    const remM = editing && editing.remSleep ? editing.remSleep % 60 : '';
+
+    fields.push(
+      { name: 'deepSleepH',  label: '深度睡眠 - 小时', type: 'number', value: deepH },
+      { name: 'deepSleepM',  label: '深度睡眠 - 分钟', type: 'number', value: deepM },
+      { name: 'lightSleepH', label: '浅度睡眠 - 小时', type: 'number', value: lightH },
+      { name: 'lightSleepM', label: '浅度睡眠 - 分钟', type: 'number', value: lightM },
+      { name: 'remSleepH',   label: '快速眼动 - 小时', type: 'number', value: remH },
+      { name: 'remSleepM',   label: '快速眼动 - 分钟', type: 'number', value: remM }
+    );
+
+    fields.push(
+      { name: 'napStart', label: '午休开始（可留空）', type: 'time', value: editing ? (editing.napStart || '') : '' },
+      { name: 'napEnd',   label: '午休结束（可留空）', type: 'time', value: editing ? (editing.napEnd || '') : '' },
+      { name: 'note', label: '备注（可选）', type: 'textarea', value: editing ? (editing.note || '') : '' }
+    );
 
     UI.form(editing ? '编辑睡眠记录' : '记录睡眠', fields).then(r => {
       if (!r) return;
       if (!r.date) { UI.toast('请选择日期'); return; }
       if (!r.sleepTime || !r.wakeTime) { UI.toast('请填写入睡和醒来时间'); return; }
 
-      const num = v => (v === '' || v == null || v === '') ? null : Number(v);
+      const num = v => (v === '' || v == null) ? null : Number(v);
+      
+      // 合并小时和分钟到分钟数
+      const deepMins = (Number(r.deepSleepH) || 0) * 60 + (Number(r.deepSleepM) || 0);
+      const lightMins = (Number(r.lightSleepH) || 0) * 60 + (Number(r.lightSleepM) || 0);
+      const remMins = (Number(r.remSleepH) || 0) * 60 + (Number(r.remSleepM) || 0);
+
       const payload = {
         date: r.date,
         sleepTime: r.sleepTime,
         wakeTime: r.wakeTime,
-        totalSleep: num(r.totalSleep),
-        deepSleep:  num(r.deepSleep),
-        lightSleep: num(r.lightSleep),
-        remSleep:   num(r.remSleep),
         awakeCount: num(r.awakeCount),
         awakeTime:  num(r.awakeTime),
+        deepSleep:  deepMins > 0 ? deepMins : null,
+        lightSleep: lightMins > 0 ? lightMins : null,
+        remSleep:   remMins > 0 ? remMins : null,
         napStart: r.napStart || null,
         napEnd:   r.napEnd || null,
         note: (r.note || '').trim()
@@ -861,7 +789,6 @@ return `<div class="module sleep-module">
           const t = d.records.find(x => x.id === editing.id);
           if (t) Object.assign(t, payload);
         } else {
-          // 同一天只保留一条记录：如果已有则覆盖提示
           const dup = d.records.find(x => x.date === payload.date);
           if (dup) {
             Object.assign(dup, payload);
