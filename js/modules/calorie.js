@@ -29,29 +29,32 @@
       records: []
     }));
     if (!Array.isArray(d.records)) d.records = [];
-
-    // 旧数据修复与补全
     if (!Array.isArray(d.presets)) d.presets = [];
-    
-    // 1. 修复旧数据：如果没有 type 字段，默认归为 'meal'
+
     let migrated = false;
+    
+    // 1. 旧数据分类补全
     d.presets.forEach(p => {
       if (!p.type) { p.type = 'meal'; migrated = true; }
     });
 
-    // 2. 检查是否缺少默认的外卖
-    const existingNames = d.presets.map(p => p.name);
-    DEFAULT_PRESETS.forEach(def => {
-      if (!existingNames.includes(def.name)) {
-        d.presets.push(def);
-        migrated = true;
-      }
-    });
+    // 2. 只在第一次加入默认外卖，绝不重复补回
+    if (!d._hasDefaultData) {
+      const existingNames = d.presets.map(p => p.name);
+      DEFAULT_PRESETS.forEach(def => {
+        if (!existingNames.includes(def.name)) {
+          d.presets.push(def);
+        }
+      });
+      d._hasDefaultData = true;
+      migrated = true;
+    }
 
     if (migrated) {
       const updater = Store.updateSilent || Store.update;
       updater.call(Store, KEY, data => {
         data.presets = d.presets;
+        data._hasDefaultData = true;
         return data;
       });
     }
@@ -301,14 +304,16 @@
         </div>`;
 
       const items = data.presets.filter(p => (p.type === 'meal' || p.type === 'drink') && (mealFilter === 'all' || p.type === mealFilter));
-      const cards = items.map(p => `
-        <div class="cal-preset-card" data-act="cal-add-preset" data-id="${p.id}">
-          <div class="cal-preset-head">
-            <span class="cal-preset-name">${U.escape(p.name)}</span>
-            <span class="cal-preset-cal">${p.cal} 大卡</span>
+          const cards = items.map(p => `
+        <div class="cal-preset-card">
+          <div class="cal-preset-body" data-act="cal-add-preset" data-id="${p.id}">
+            <div class="cal-preset-head">
+              <span class="cal-preset-name">${U.escape(p.name)}</span>
+              <span class="cal-preset-cal">${p.cal} 大卡</span>
+            </div>
+            ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
           </div>
-          ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
-          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">删除</button>
+          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">✕</button>
         </div>
       `).join('');
 
@@ -322,14 +327,16 @@
     /* ---- 3. 零食 ---- */
     else if (viewTab === 'snack') {
       const items = data.presets.filter(p => p.type === 'snack');
-      const cards = items.map(p => `
-        <div class="cal-preset-card snack-card" data-act="cal-add-preset" data-id="${p.id}">
-          <div class="cal-preset-head">
-            <span class="cal-preset-name">${U.escape(p.name)}</span>
-            <span class="cal-preset-cal">${p.cal} 大卡/包</span>
+          const cards = items.map(p => `
+        <div class="cal-preset-card snack-card">
+          <div class="cal-preset-body" data-act="cal-add-preset" data-id="${p.id}">
+            <div class="cal-preset-head">
+              <span class="cal-preset-name">${U.escape(p.name)}</span>
+              <span class="cal-preset-cal">${p.cal} 大卡/包</span>
+            </div>
+            ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
           </div>
-          ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
-          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">删除</button>
+          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">✕</button>
         </div>
       `).join('');
 
@@ -348,14 +355,16 @@
     /* ---- 4. 水果 ---- */
     else if (viewTab === 'fruit') {
       const items = data.presets.filter(p => p.type === 'fruit');
-      const cards = items.map(p => `
-        <div class="cal-preset-card fruit-card" data-act="cal-add-preset" data-id="${p.id}">
-          <div class="cal-preset-head">
-            <span class="cal-preset-name">${U.escape(p.name)}</span>
-            <span class="cal-preset-cal">${p.cal} 大卡/100g</span>
+          const cards = items.map(p => `
+        <div class="cal-preset-card fruit-card">
+          <div class="cal-preset-body" data-act="cal-add-preset" data-id="${p.id}">
+            <div class="cal-preset-head">
+              <span class="cal-preset-name">${U.escape(p.name)}</span>
+              <span class="cal-preset-cal">${p.cal} 大卡/100g</span>
+            </div>
+            ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
           </div>
-          ${p.tip ? `<div class="cal-preset-tip">💡 ${U.escape(p.tip)}</div>` : ''}
-          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">删除</button>
+          <button class="cal-preset-del" data-act="cal-del-food" data-id="${p.id}">✕</button>
         </div>
       `).join('');
 

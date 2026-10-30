@@ -87,3 +87,34 @@
 .cal-progress { height: 6px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
 .cal-progress > i { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
 .cal-progress > i.over { background: var(--danger); }
+/* 修复误触：卡片主体与删除按钮分离 */
+.cal-preset-card {
+  position: relative;
+  padding: 14px;
+  padding-right: 44px; /* 给右上角删除按钮留出空间 */
+  box-sizing: border-box;
+}
+.cal-preset-body {
+  cursor: pointer;
+}
+.cal-preset-body:active {
+  opacity: 0.7;
+}
+.cal-preset-del {
+  position: absolute;
+  top: 0; 
+  right: 0;
+  width: 44px; 
+  height: 44px;
+  border: none; 
+  background: transparent;
+  color: #ccc; 
+  font-size: 16px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  cursor: pointer;
+}
+.cal-preset-del:active { 
+  color: var(--danger); 
+}
