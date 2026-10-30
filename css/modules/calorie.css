@@ -1,0 +1,89 @@
+/* =====================================================
+   热量记录与饮食管理
+   ===================================================== */
+.calorie-module { position: relative; padding-bottom: 24px; }
+.cal-tabs { display: flex; overflow-x: auto; scrollbar-width: none; }
+.cal-tabs::-webkit-scrollbar { display: none; }
+.cal-tabs .tab { padding: 8px 12px; font-size: 13px; }
+
+/* ---------- 1. 头部大卡片 ---------- */
+.cal-hero {
+  background: linear-gradient(135deg, #fff, #f4faf5);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px; margin-bottom: 14px; text-align: center;
+  border: 1px solid rgba(255,255,255,.8);
+}
+.cal-hero.is-over { background: linear-gradient(135deg, #fff, #fdf2f2); border-color: #f8d7da; }
+.cal-hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.cal-hero-title { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.cal-hero-setting { border: none; background: transparent; color: var(--text-3); font-size: 12px; cursor: pointer; }
+.cal-hero-val { font-size: 38px; font-weight: 800; color: var(--primary-deep); line-height: 1; margin-bottom: 8px; letter-spacing: -1px; }
+.cal-hero.is-over .cal-hero-val { color: var(--danger); }
+.cal-hero-val > span { font-size: 14px; font-weight: 600; margin-left: 4px; }
+.cal-hero-hint { font-size: 13px; color: var(--text-3); margin-bottom: 16px; }
+.cal-hero.is-over .cal-hero-hint { color: var(--danger); font-weight: 600; }
+.cal-hero-bar { height: 10px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+.cal-hero-bar > i { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.cal-hero-bar > i.over { background: var(--danger); }
+
+/* ---------- 2. 今日记录 ---------- */
+.cal-list { display: flex; flex-direction: column; gap: 8px; }
+.cal-item { background: #fff; border-radius: 12px; padding: 14px; box-shadow: var(--shadow-sm); position: relative; }
+.cal-item-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.cal-item-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.cal-item-val { font-size: 15px; font-weight: 700; color: #c47a2f; }
+.cal-item-sub { font-size: 12px; color: var(--text-3); padding-right: 20px; }
+.cal-item-del { position: absolute; right: 12px; bottom: 12px; border: none; background: transparent; color: #ccc; cursor: pointer; }
+
+/* ---------- 3. 快捷食物卡片 ---------- */
+.cal-filter-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.cal-filter-bar button { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--text-2); font-size: 13px; }
+.cal-filter-bar button.active { background: var(--primary-soft); color: var(--primary-deep); border-color: var(--primary); font-weight: 600; }
+
+.cal-preset-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.cal-preset-card {
+  background: #fff; border-radius: var(--radius); padding: 14px;
+  box-shadow: var(--shadow-sm); border-left: 4px solid #f0a020;
+  cursor: pointer; position: relative;
+}
+.cal-preset-card.snack-card { border-left-color: #d9534f; }
+.cal-preset-card.fruit-card { border-left-color: #4caf7d; }
+.cal-preset-card:active { transform: scale(0.98); background: #fafbfc; }
+.cal-preset-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.cal-preset-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.cal-preset-cal { font-size: 14px; font-weight: 700; color: var(--text-2); }
+.cal-preset-tip { font-size: 12px; color: #b8760a; background: #fef4e0; padding: 6px 10px; border-radius: 8px; line-height: 1.4; margin-top: 6px; }
+.cal-preset-del { position: absolute; right: 12px; bottom: 12px; border: none; background: transparent; font-size: 11px; color: #ccc; cursor: pointer; }
+
+.cal-add-row { display: flex; gap: 8px; }
+.cal-add-row .btn { flex: 1; }
+.cal-sub-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--text-3); font-weight: 600; }
+
+/* 零食临时计算器 */
+.cal-snack-calc-card {
+  background: #fff; border: 1.5px dashed var(--line);
+  padding: 16px; border-radius: 12px; display: flex;
+  justify-content: space-between; align-items: center;
+  color: var(--text-2); font-size: 13px; cursor: pointer;
+}
+
+/* ---------- 4. 历史卡片 ---------- */
+.cal-history-list-wrap { display: flex; flex-direction: column; gap: 12px; }
+.cal-history-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
+.cal-history-head { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line-soft); padding-bottom: 8px; margin-bottom: 8px; }
+.cal-history-date { font-size: 14px; font-weight: 700; color: var(--text); }
+.cal-history-total { font-size: 14px; font-weight: 700; color: var(--primary-deep); }
+.cal-history-total.over { color: var(--danger); }
+.cal-history-list { display: flex; flex-direction: column; gap: 4px; }
+.cal-history-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); }
+
+/* 主页小卡片 */
+.cal-home-main { margin: 8px 0 4px; display: flex; align-items: baseline; gap: 4px; }
+.cal-home-num { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1; }
+.cal-home-num.over { color: var(--danger); }
+.cal-home-unit { font-size: 13px; color: var(--text-3); }
+.cal-home-hint { font-size: 12px; color: var(--primary-deep); font-weight: 500; margin-bottom: 8px; }
+.cal-home-hint.over { color: var(--danger); }
+.cal-progress { height: 6px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+.cal-progress > i { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+.cal-progress > i.over { background: var(--danger); }
